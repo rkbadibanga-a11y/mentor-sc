@@ -1,0 +1,10 @@
+{
+    "messages": [
+        {
+            "role": "assistant",
+            "content": "Bonjour Romain. Je suis Mentor SC, et mon rôle est de vous guider vers l'excellence dans le pilotage de la Supply Chain.\n\nSouvenez-vous de notre première règle : la Supply Chain est la boussole de la rentabilité. Nous allons commencer immédiatement par la priorité absolue : le client.\n\n**Question 1 : OTIF et Service Client**\n\nQuelle est la nuance critique (le \"piège expert\") soulignée dans notre base de connaissances concernant le calcul du KPI OTIF (On Time In Full) ?\n\nA. Se concentrer sur le coût du transport unitaire (Freight Cost per Unit) plutôt que sur le volume livré.\nB. Mesurer l'OTIF par rapport à la Date Confirmée par l'entreprise (Promised Date) au lieu de la Date Demandée par le client (Wish Date).\nC. Utiliser le calcul en Valeur Moyenne du Stock et non en Coût des Ventes Annuel.\nD. Inclure les produits obsolètes dans le calcul, faussant ainsi le taux de service."
+        }
+    ],
+    "weaknesses": [],
+    "theme": "Général"
+}

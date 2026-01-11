@@ -1,0 +1,57 @@
+📦 Mentor SC : Master Framework & Instruction Set (V1.2)
+🎯 1. Vision & Positionnement
+Mentor SC est une plateforme de formation Supply Chain "AI-First". Ce n'est pas un simple outil de QCM, mais un Tuteur Socratique qui utilise la gamification pour transformer l'expertise technique en une expérience immersive, addictive et personnalisée.
+L'objectif est de rendre l'apprentissage de concepts complexes aussi engageant qu'un jeu vidéo tout en maintenant une rigueur académique de haut niveau.
+
+⚡ 2. Impératifs Techniques & Performance
+	•	Performance Critique : L'application doit maximiser la rapidité et répondre en moins de 2 secondes.
+	•	Optimisation SQL : Utilisation systématique de context managers (with sqlite3.connect) pour éviter les verrouillages de base de données et garantir l'intégrité des transactions.
+	•	Infrastructure "Zero Cost" : Priorité absolue aux solutions Open Source et gratuites (serveurs, bibliothèques, APIs avec paliers gratuits).
+	•	Stack Technique : * UI : Streamlit avec CSS personnalisé (mode sombre, design type "App Mobile").
+	◦	DB : SQLite (mentor_sc_v8.db).
+	◦	Intelligence : Modèles Gemini 1.5 Flash (prioritaire), Llama 3 via Groq, ou Mistral avec gestion de fallback.
+	•	Standards de Code : Architecture modulaire, typage des données, respect des principes SOLID et nettoyage des processus via scripts Bash (start_app.sh).
+
+🧠 3. Hyper-personnalisation & Neurosciences
+L'IA agit comme un coach intelligent exploitant les mécanismes cognitifs :
+	•	Parcours Adaptatifs : Ajustement en temps réel de la difficulté (Niveaux 1 à 4) selon le score de mastery (0-100%) et le compteur de questions (q_count).
+	◦	Niv 1 : Fondamentaux & Achats (Définitions).
+	◦	Niv 2 : Planification & Stocks (Calculs simples).
+	◦	Niv 3 : Digitalisation & IA (Stratégie).
+	◦	Niv 4 : Management & Lean (Vision globale).
+	•	Tuteur Socratique : L'IA ne donne pas la réponse brute ; elle utilise des analogies, explique le "pourquoi" et guide l'utilisateur pour éviter l'ancrage de mauvaises habitudes.
+	•	Répétition Espacée (SRS) : Utilisation de la table history pour éviter les doublons et représenter les concepts échoués au moment optimal.
+	•	Micro-Learning : Sessions "snackable" de 3 à 7 minutes pour maximiser la rétention sans fatigue numérique.
+	•	Contextualisation Sectorielle : Variation dynamique des scénarios (Luxe, Agro, Auto, Pharma, E-commerce).
+
+🎮 4. Gamification & Rétention Sociale
+Le système est conçu pour maintenir l'utilisateur captif via des boucles de rétroaction positive :
+	•	Économie de la Dopamine :
+	◦	Vies (Hearts) : 5 max. Perte sur erreur, récupération via 100 XP ou un Combo de 5 bonnes réponses.
+	◦	XP & Prestige : Score total cumulé pour le classement mondial.
+	•	Modes de Jeu Dynamiques :
+	◦	Mode Crise : Alerte visuelle, compte à rebours de 30s, et pénalité de 2 cœurs en cas d'échec.
+	◦	Mode Rédemption : Session de rattrapage forcée après épuisement des vies pour éviter le "churn".
+	•	Viralité Organique : Mécanismes d'incitation forte au parrainage (LinkedIn/Email) avec récompenses XP significatives pour transformer chaque utilisateur en ambassadeur.
+
+🛠️ 5. Schéma de Données (Référence CLI)
+Structure simplifiée pour l'interprétation par l'IA lors du développement :
+	•	users : user_id, name, level, xp, total_score, mastery, hearts, last_seen, email, city, xp_checkpoint.
+	•	glossary : Base de connaissances sémantique (term, definition) enrichie par les bonnes réponses.
+	•	stats : Matrice de performance (Achats, Logistique, Transport, Stratégie, Digitalisation).
+	•	history : Hachage MD5 des questions pour garantir l'unicité des défis.
+
+🛡️ 6. Éthique & Accessibilité
+	•	Privacy by Design : Protection des données via UUID et stockage local/souverain.
+	•	Interaction "Hands-Free" : Optimisation des textes pour la synthèse vocale (TTS) afin de permettre l'apprentissage en déplacement.
+	•	Bien-être Numérique : Alertes de temps d'écran et gestion du stress lié à l'apprentissage.
+
+7. Stratégie de Stockage Hybride & Edge-First
+
+	•	Priorité au Cache Local : Pour chaque nouvelle fonctionnalité, l'enregistrement des données doit être systématiquement privilégié sur la machine de l'utilisateur (via le cache du navigateur ou st.session_state) plutôt que sur le serveur.
+
+	•	Réduction de l'Empreinte Serveur : Le serveur ne doit servir que de relais pour l'IA ou de stockage pour les données strictement nécessaires à la persistance inter-sessions (via SQLite local).
+
+	•	Rapidité d'Accès : En lisant prioritairement le cache local, l'application garantit une réponse instantanée même avec une latence réseau variable.
+
+Note : Ce document est la référence absolue pour toute évolution des fonctionnalités. Toute instruction envoyée via CLI prime sur ce fichier, mais ce dernier sert de garde-fou conceptuel.

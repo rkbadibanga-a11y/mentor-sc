@@ -1,0 +1,19 @@
+# Streamlit & Python
+.streamlit/
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/
+
+# Base de données locale
+mentor_sc_v8.db
+mentor_sc_v8.db-journal
+
+# Logs & Temp
+*.log
+QuestionGeminiRBA/
+TEMP_ALL_CODE.txt
+FULL_CODE_V2.txt
+MENTOR_SC_DEBUG_CONSOLIDATED.txt
+MENTOR_SC_DEBUG_CONSOLIDATED_V2.txt

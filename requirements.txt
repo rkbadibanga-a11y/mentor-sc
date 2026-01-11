@@ -1,0 +1,14 @@
+streamlit
+google-generativeai
+python-dotenv
+pypdf
+python-docx
+pandas
+openpyxl
+groq
+mistralai
+plotly
+streamlit-lottie
+Pillow
+reportlab
+supabase

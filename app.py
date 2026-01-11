@@ -60,7 +60,7 @@ def main():
                 'current_run_xp': int(res[16] or 0),
                 'joker_5050': int(res[17] if len(res)>17 else 3), 
                 'joker_hint': int(res[18] if len(res)>18 else 3),
-                'data': None, 'question_queue': [], 'consecutive_wins': 0,
+                'data': None, 'question_queue': [], 'chat_history': [], 'consecutive_wins': 0,
                 'active_tab': 'mission', 'celebration_done': False, 'show_diploma': False,
                 'prefetched_data': None, 'current_engine': 'Base de données',
                 'crisis_dialog_shown': False, 'result': None, 'last_result': None,

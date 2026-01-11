@@ -1,9 +1,11 @@
 # core/database.py
 import sqlite3
 import os
+import json
 import streamlit as st
+from pathlib import Path
 from contextlib import contextmanager
-from core.config import DB_FILE
+from core.config import DB_FILE, ROOT_DIR
 from supabase import create_client, Client
 
 class DatabaseManager:
@@ -80,6 +82,34 @@ def sync_user_to_supabase(user_id):
     except Exception as e:
         print(f"Supabase Sync Error: {e}")
 
+def seed_questions():
+    """Importe les questions depuis le fichier JSON si la base est vide."""
+    count = run_query("SELECT COUNT(*) FROM question_bank", fetch_one=True)[0]
+    if count > 0:
+        return # La base est déjà peuplée
+
+    seed_file = Path(ROOT_DIR) / "questions_seed.json"
+    if not seed_file.exists():
+        return # Pas de fichier seed disponible
+
+    try:
+        with open(seed_file, "r", encoding="utf-8") as f:
+            questions = json.load(f)
+            for q in questions:
+                run_query("""
+                    INSERT INTO question_bank 
+                    (category, concept, level, question, options, correct, explanation, theory, example, tip, triad_id, triad_position) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    q.get('category'), q.get('concept'), q.get('level'), 
+                    q.get('question'), q.get('options'), q.get('correct'), 
+                    q.get('explanation'), q.get('theory'), q.get('example'), 
+                    q.get('tip'), q.get('triad_id'), q.get('triad_position')
+                ), commit=True)
+        st.success(f"🌱 {len(questions)} questions importées avec succès !")
+    except Exception as e:
+        st.error(f"Erreur lors de l'import des questions : {e}")
+
 def init_db():
     """Initialise les tables locales et tente de créer les tables Cloud."""
     queries = [
@@ -103,6 +133,9 @@ def init_db():
     # Index
     run_query("CREATE INDEX IF NOT EXISTS idx_triad ON question_bank(triad_id, triad_position)")
     
+    # Peuplement initial si nécessaire
+    seed_questions()
+
     # Nettoyage automatique des termes parasites du glossaire
     run_query("DELETE FROM glossary WHERE definition LIKE '%Définition%' OR definition LIKE '%Déf%' OR definition LIKE '%?%' OR term = 'Terme' OR term = 'Objet';", commit=True)
 

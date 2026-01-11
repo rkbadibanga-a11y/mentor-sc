@@ -52,12 +52,104 @@ def run_query(query: str, params: tuple = (), fetch_one=False, fetch_all=False, 
             result = True
 
     # 2. Synchronisation Cloud (Arrière-plan)
-    # On ne synchronise que les mises à jour critiques de l'utilisateur
-    if commit and "UPDATE users" in query.upper():
-        st.info("☁️ Synchro Cloud...") # Optionnel : feedback visuel discret
-        sync_user_to_supabase(params[-1]) # L'UID est toujours le dernier paramètre des UPDATE users
+    if commit:
+        q_upper = query.upper()
+        uid = st.session_state.get('user_id') or (params[0] if params else None)
+        if not uid: return result # Impossible de synchroniser sans UID
         
+        # On synchronise les mises à jour critiques
+        if "UPDATE USERS" in q_upper:
+            sync_user_to_supabase(uid)
+        elif "HISTORY" in q_upper and "INSERT" in q_upper:
+            sync_table_to_supabase("history", uid, {"user_id": uid, "question_hash": params[1] if len(params)>1 else ""})
+        elif "STATS" in q_upper and ("INSERT" in q_upper or "UPDATE" in q_upper):
+            # Récupérer la valeur à jour pour synchroniser
+            cat = params[1] if len(params)>1 else "Général"
+            st_res = run_query("SELECT correct_count FROM stats WHERE user_id=? AND category=?", (uid, cat), fetch_one=True, commit=False)
+            if st_res:
+                sync_table_to_supabase("stats", uid, {"user_id": uid, "category": cat, "correct_count": st_res[0]})
+        elif "GLOSSARY" in q_upper and ("INSERT" in q_upper or "UPDATE" in q_upper):
+            term = params[1] if "INSERT" in q_upper else (params[5] if len(params)>5 else params[0])
+            g_res = run_query("SELECT * FROM glossary WHERE user_id=? AND term=?", (uid, term), fetch_one=True, commit=False)
+            if g_res:
+                sync_table_to_supabase("glossary", uid, {
+                    "user_id": g_res[0], "term": g_res[1], "definition": g_res[2], 
+                    "category": g_res[3], "use_case": g_res[4], "business_impact": g_res[5], "short_definition": g_res[6]
+                })
+        elif "NOTES" in q_upper and ("INSERT" in q_upper or "UPDATE" in q_upper):
+            nid = params[1] if "INSERT" in q_upper else (params[2] if len(params)>2 else params[0])
+            n_res = run_query("SELECT * FROM notes WHERE user_id=? AND note_id=?", (uid, nid), fetch_one=True, commit=False)
+            if n_res:
+                sync_table_to_supabase("notes", uid, {
+                    "user_id": n_res[0], "note_id": n_res[1], "title": n_res[2], "content": n_res[3], "timestamp": n_res[4]
+                })
+            
     return result
+
+def sync_table_to_supabase(table, user_id, data):
+    """Synchronise une ligne spécifique vers une table Supabase."""
+    sb = DatabaseManager.get_supabase()
+    if not sb: return
+    try:
+        sb.table(table).upsert(data).execute()
+    except Exception as e:
+        print(f"Supabase Sync Error ({table}): {e}")
+
+def pull_user_data_from_supabase(user_id):
+    """Récupère toutes les données d'un utilisateur depuis Supabase et les injecte en local."""
+    sb = DatabaseManager.get_supabase()
+    if not sb: return False
+    
+    try:
+        # 1. Table USERS
+        res = sb.table("users").select("*").eq("user_id", user_id).execute()
+        if res.data:
+            u = res.data[0]
+            run_query("""
+                INSERT OR REPLACE INTO users 
+                (user_id, name, level, xp, total_score, mastery, q_count, hearts, email, city, crisis_wins, has_diploma, joker_5050, joker_hint)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                u['user_id'], u['name'], u.get('level', 1), u.get('xp', 0), 
+                u.get('total_score', 0), u.get('mastery', 0), u.get('q_count', 0), 
+                u.get('hearts', 5), u['email'], u.get('city', ''), u.get('crisis_wins', 0),
+                u.get('has_diploma', 0), u.get('joker_5050', 3), u.get('joker_hint', 3)
+            ), commit=False)
+
+        # 2. Table HISTORY (Crucial pour les questions répétées)
+        res = sb.table("history").select("*").eq("user_id", user_id).execute()
+        for h in res.data:
+            run_query("INSERT OR IGNORE INTO history (user_id, question_hash) VALUES (?, ?)", 
+                     (h['user_id'], h['question_hash']), commit=False)
+
+        # 3. Table STATS
+        res = sb.table("stats").select("*").eq("user_id", user_id).execute()
+        for s in res.data:
+            run_query("INSERT OR REPLACE INTO stats (user_id, category, correct_count) VALUES (?, ?, ?)", 
+                     (s['user_id'], s['category'], s['correct_count']), commit=False)
+
+        # 4. Table NOTES
+        res = sb.table("notes").select("*").eq("user_id", user_id).execute()
+        for n in res.data:
+            run_query("INSERT OR REPLACE INTO notes (user_id, note_id, title, content, timestamp) VALUES (?, ?, ?, ?, ?)", 
+                     (n['user_id'], n['note_id'], n['title'], n['content'], n['timestamp']), commit=False)
+
+        # 5. Table GLOSSARY
+        res = sb.table("glossary").select("*").eq("user_id", user_id).execute()
+        for g in res.data:
+            run_query("""
+                INSERT OR REPLACE INTO glossary 
+                (user_id, term, definition, category, use_case, business_impact, short_definition) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                g['user_id'], g['term'], g['definition'], g['category'], 
+                g.get('use_case'), g.get('business_impact'), g.get('short_definition')
+            ), commit=False)
+
+        return True
+    except Exception as e:
+        print(f"Supabase Pull Error: {e}")
+        return False
 
 def sync_user_to_supabase(user_id):
     """Envoie une copie des données utilisateur vers Supabase."""
@@ -73,7 +165,8 @@ def sync_user_to_supabase(user_id):
         "user_id": local_data[0], "name": local_data[1], "level": local_data[2],
         "xp": local_data[3], "total_score": local_data[4], "mastery": local_data[5],
         "q_count": local_data[6], "hearts": local_data[7], "email": local_data[9],
-        "city": local_data[10], "crisis_wins": local_data[13], "has_diploma": local_data[15]
+        "city": local_data[10], "crisis_wins": local_data[13], "has_diploma": local_data[15],
+        "joker_5050": local_data[17], "joker_hint": local_data[18]
     }
     
     try:

@@ -151,6 +151,12 @@ class QuizEngine:
             run_query('INSERT OR IGNORE INTO history (user_id, question_hash) VALUES (?, ?)', (uid, h), commit=True)
             run_query('INSERT INTO stats (user_id, category, correct_count) VALUES (?, ?, 1) ON CONFLICT(user_id, category) DO UPDATE SET correct_count = correct_count + 1', (uid, q_data.get("category", "Général")), commit=True)
             
+            # Enrichissement du Glossaire
+            concept = q_data.get('concept_key') or q_data.get('concept')
+            if concept and len(str(concept)) > 2:
+                run_query('INSERT OR IGNORE INTO glossary (user_id, term, definition, category) VALUES (?, ?, ?, ?)',
+                         (uid, concept, q_data.get('explanation', ''), q_data.get('category', 'Général')), commit=True)
+
             # Badge Detection
             old_c = run_query('SELECT correct_count FROM stats WHERE user_id=? AND category=?', (uid, q_data.get("category", "Général")), fetch_one=True)
             old_val = old_c[0] if old_c else 0

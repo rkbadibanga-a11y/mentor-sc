@@ -12,3 +12,4 @@ streamlit-lottie
 Pillow
 reportlab
 supabase
+duckduckgo_search

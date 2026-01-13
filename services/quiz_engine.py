@@ -70,16 +70,34 @@ class QuizEngine:
         return self._fetch_specific(level_filter, None, uid, False)
 
     def _fetch_specific(self, lvl, pos, uid, fresh):
+        if 'recently_seen' not in st.session_state:
+            st.session_state.recently_seen = []
+            
         clause = f"WHERE level={lvl}"
         if pos: clause += f" AND triad_position={pos}"
         if fresh: clause += " AND triad_id NOT LIKE 'GOLDEN%'"
         query = f"SELECT id, category, concept, level, question, options, correct, explanation, theory, example, tip FROM question_bank {clause} ORDER BY RANDOM() LIMIT 1"
-        for _ in range(3):
+        
+        for _ in range(5): # On tente 5 fois pour trouver une nouvelle
             res = run_query(query, fetch_one=True)
             if res:
                 h = hashlib.md5(res[4].encode()).hexdigest()
-                if not run_query('SELECT 1 FROM history WHERE user_id=? AND question_hash=?', (uid, h), fetch_one=True):
+                # 1. Check permanent history (seulement si correct dans le passé)
+                already_solved = run_query('SELECT 1 FROM history WHERE user_id=? AND question_hash=?', (uid, h), fetch_one=True)
+                # 2. Check session recency (même si faux, on ne veut pas la revoir tout de suite)
+                is_recent = h in st.session_state.recently_seen
+                
+                if not already_solved and not is_recent:
+                    # Ajouter à la liste de récence (max 20)
+                    st.session_state.recently_seen.append(h)
+                    if len(st.session_state.recently_seen) > 20:
+                        st.session_state.recently_seen.pop(0)
                     return {"id":res[0],"category":res[1],"concept_key":res[2],"question":res[4],"options":json.loads(res[5]),"correct":res[6],"explanation":res[7],"theory":res[8],"example":res[9],"tip":res[10]}
+        
+        # Fallback: si on ne trouve rien de nouveau après 5 essais, on accepte une question récente mais non résolue
+        res = run_query(query, fetch_one=True)
+        if res:
+             return {"id":res[0],"category":res[1],"concept_key":res[2],"question":res[4],"options":json.loads(res[5]),"correct":res[6],"explanation":res[7],"theory":res[8],"example":res[9],"tip":res[10]}
         return None
 
     def prefetch_next_question(self):

@@ -17,6 +17,7 @@ from ui.views.masterclass import render_masterclass
 from ui.views.notes import render_notes
 from ui.views.profile import render_profile
 from ui.views.glossary import render_glossary
+from ui.views.tools import render_tools
 from utils.assets import trigger_queued_sounds
 from services.certificate_factory import show_diploma_celebration
 import time 
@@ -118,6 +119,7 @@ def main():
             "mission": "🎯 Mission", 
             "coach": "💬 Mentor SC", 
             "process": "📚 Master Class", 
+            "tools": "🛠️ Outils",
             "glossary": "📖 Glossaire", 
             "notes": "📝 Notes", 
             "profile": "📊 Profil",
@@ -147,6 +149,7 @@ def main():
         if tab == "mission": render_mission()
         elif tab == "coach": render_coach()
         elif tab == "process": render_masterclass()
+        elif tab == "tools": render_tools()
         elif tab == "leaderboard":
             from ui.views.leaderboard import render_leaderboard
             render_leaderboard()

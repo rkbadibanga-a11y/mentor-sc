@@ -16,9 +16,12 @@ def create_excel_export(title, data_dict, summary_metrics=None):
     # --- Header Branding ---
     ws['A1'] = "MENTOR SC - L'EXPERT SUPPLY CHAIN"
     ws['A1'].font = Font(bold=True, size=14, color="00DFD8")
+    
     ws['A2'] = "Contact : mentor.sc.app@gmail.com"
-    ws['A3'] = "Developed with ❤️ by Romain Badibanga"
-    ws['A3'].font = Font(italic=True, size=9)
+    
+    ws['A3'] = "Developed with Love by Romain Badibanga"
+    ws['A3'].font = Font(italic=True, size=9, color="007CF0")
+    ws['A3'].hyperlink = "https://www.linkedin.com/in/romainbadibanga/"
 
     # Styles
     title_font = Font(name='Arial', size=16, bold=True, color="1E293B")
@@ -151,7 +154,12 @@ def create_pdf_export(title, data_dict, summary_metrics=None):
     # --- Footer ---
     c.setFont("Helvetica-Oblique", 8)
     c.setFillColor(colors.grey)
-    c.drawCentredString(width/2, 1.5*cm, "Developed with ❤️ by Romain Badibanga")
+    footer_text = "Developed with Love by Romain Badibanga"
+    c.drawCentredString(width/2, 1.5*cm, footer_text)
+    
+    # Lien LinkedIn cliquable
+    c.linkURL("https://www.linkedin.com/in/romainbadibanga/", (width/2 - 3*cm, 1.3*cm, width/2 + 3*cm, 1.7*cm), relative=0)
+    
     c.drawCentredString(width/2, 1.1*cm, "mentor.sc.app@gmail.com - Rapport généré par l'application Mentor SC")
 
     c.save()

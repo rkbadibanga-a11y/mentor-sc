@@ -138,50 +138,60 @@ def main():
         # --- CÉLÉBRATION DIPLÔME (Écran prioritaire) ---
         if st.session_state.show_diploma:
             show_diploma_celebration()
-            return # On stoppe le rendu ici pour afficher uniquement la fête
+            return
 
-        # 1. RENDU BARRE LATÉRALE (Uniquement ici)
+        # 1. BARRE LATÉRALE : NAVIGATION & STATS
         with st.sidebar:
+            # --- NAVIGATION GROUPÉE ---
+            st.markdown("### 🧭 MENU")
+            
+            # GROUPE 1 : JEU
+            st.caption("🚀 PILOTAGE")
+            c1, c2 = st.columns(2)
+            if c1.button("🎯 Mission", use_container_width=True, type="primary" if st.session_state.active_tab == "mission" else "secondary"):
+                st.session_state.active_tab = "mission"; st.rerun()
+            if c2.button("🧠 Audit", use_container_width=True, type="primary" if st.session_state.active_tab == "coach" else "secondary"):
+                st.session_state.active_tab = "coach"; st.rerun()
+            
+            # GROUPE 2 : SAVOIR
+            st.caption("📖 ACADÉMIE")
+            if st.button("📚 Master Class", use_container_width=True, type="primary" if st.session_state.active_tab == "process" else "secondary"):
+                st.session_state.active_tab = "process"; st.rerun()
+            col_s1, col_s2 = st.columns(2)
+            if col_s1.button("📖 Glossaire", use_container_width=True, type="primary" if st.session_state.active_tab == "glossary" else "secondary"):
+                st.session_state.active_tab = "glossary"; st.rerun()
+            if col_s2.button("📝 Notes", use_container_width=True, type="primary" if st.session_state.active_tab == "notes" else "secondary"):
+                st.session_state.active_tab = "notes"; st.rerun()
+
+            # GROUPE 3 : MÉTIER
+            st.caption("🛠️ EXPERTISE")
+            if st.button("🛠️ Boîte à Outils SC", use_container_width=True, type="primary" if st.session_state.active_tab == "tools" else "secondary"):
+                st.session_state.active_tab = "tools"; st.rerun()
+
+            # GROUPE 4 : PROFIL
+            st.caption("🏆 RÉSULTATS")
+            col_p1, col_p2 = st.columns(2)
+            if col_p1.button("📊 Profil", use_container_width=True, type="primary" if st.session_state.active_tab == "profile" else "secondary"):
+                st.session_state.active_tab = "profile"; st.rerun()
+            if col_p2.button("🥇 Classement", use_container_width=True, type="primary" if st.session_state.active_tab == "leaderboard" else "secondary"):
+                st.session_state.active_tab = "leaderboard"; st.rerun()
+
+            # GROUPE 5 : ADMIN
+            user_email = st.session_state.get('user_email')
+            from core.config import ADMIN_EMAILS
+            if user_email in ADMIN_EMAILS:
+                st.caption("👮 ADMINISTRATION")
+                if st.button("🔐 Dashboard Admin", use_container_width=True, type="primary" if st.session_state.active_tab == "admin" else "secondary"):
+                    st.session_state.active_tab = "admin"; st.rerun()
+
+            st.markdown("---")
+            # Rendu des stats et paramètres existants
             render_sidebar()
 
         # 2. Événements de fond
         trigger_queued_sounds()
         
-        # 3. Navigation Principale
-        menu = {
-            "mission": "🎯 Mission", 
-            "coach": "🧠 Audit Expert", 
-            "process": "📚 Master Class", 
-            "tools": "🛠️ Outils",
-            "glossary": "📖 Glossaire", 
-            "notes": "📝 Notes", 
-            "profile": "📊 Profil",
-            "leaderboard": "🏆 Classement"
-        }
-        
-        # Ajout onglet Admin si autorisé
-        from core.config import ADMIN_EMAILS
-        user_email = st.session_state.get('user_email')
-        if user_email in ADMIN_EMAILS:
-            menu["admin"] = "👮 Admin"
-        
-        if "active_tab" not in st.session_state:
-            st.session_state.active_tab = "mission"
-
-        selected = st.pills(
-            "Menu", 
-            options=list(menu.keys()), 
-            format_func=lambda x: menu[x], 
-            default=st.session_state.active_tab, 
-            label_visibility="collapsed",
-            key="main_nav_pills"
-        )
-        
-        if selected and selected != st.session_state.active_tab:
-            st.session_state.active_tab = selected
-            st.rerun()
-
-        st.markdown("<br>", unsafe_allow_html=True)
+        # 3. Rendu du contenu (plus de pills ici)
         uid = st.session_state.user_id
         tab = st.session_state.active_tab
         

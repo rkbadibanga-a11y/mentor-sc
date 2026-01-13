@@ -16,8 +16,8 @@ def create_excel_export(title, data_dict, summary_metrics=None):
     # --- Header Branding ---
     ws['A1'] = "MENTOR SC - L'EXPERT SUPPLY CHAIN"
     ws['A1'].font = Font(bold=True, size=14, color="00DFD8")
-    ws['A2'] = "Contact : r.k.badibanga@gmail.com"
-    ws['A3'] = "Developed with ❤️ by Mentor SC"
+    ws['A2'] = "Contact : mentor.sc.app@gmail.com"
+    ws['A3'] = "Developed with ❤️ by Romain Badibanga"
     ws['A3'].font = Font(italic=True, size=9)
 
     # Styles
@@ -78,7 +78,7 @@ def create_pdf_export(title, data_dict, summary_metrics=None):
     c.setFillColor(colors.white)
     c.setFont("Helvetica", 10)
     c.drawString(1.5*cm, height - 2.5*cm, "L'Expert Supply Chain au service de votre performance")
-    c.drawString(1.5*cm, height - 3.0*cm, "Contact : r.k.badibanga@gmail.com")
+    c.drawString(1.5*cm, height - 3.0*cm, "Contact : mentor.sc.app@gmail.com")
     
     # White line
     c.setStrokeColor(colors.white)
@@ -151,8 +151,8 @@ def create_pdf_export(title, data_dict, summary_metrics=None):
     # --- Footer ---
     c.setFont("Helvetica-Oblique", 8)
     c.setFillColor(colors.grey)
-    c.drawCentredString(width/2, 1.5*cm, "Developed with ❤️ by Mentor SC - r.k.badibanga@gmail.com")
-    c.drawCentredString(width/2, 1.1*cm, "Rapport généré automatiquement par l'application Mentor SC")
+    c.drawCentredString(width/2, 1.5*cm, "Developed with ❤️ by Romain Badibanga")
+    c.drawCentredString(width/2, 1.1*cm, "mentor.sc.app@gmail.com - Rapport généré par l'application Mentor SC")
 
     c.save()
     buffer.seek(0)

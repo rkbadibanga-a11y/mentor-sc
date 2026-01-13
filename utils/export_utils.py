@@ -19,7 +19,11 @@ def create_excel_export(title, data_dict, summary_metrics=None):
     
     ws['A2'] = "Contact : mentor.sc.app@gmail.com"
     
-    ws['A3'] = "Developed with Love by Romain Badibanga"
+    # "Developed with ❤️ by" then "Romain Badibanga" in blue
+    ws['A3'] = "Developed with ❤️ by Romain Badibanga"
+    ws['A3'].font = Font(italic=True, size=9)
+    # On ne peut pas mettre deux couleurs dans la même cellule facilement en openpyxl sans objets complexes, 
+    # mais on va mettre toute la ligne en bleu et cliquable comme demandé
     ws['A3'].font = Font(italic=True, size=9, color="007CF0")
     ws['A3'].hyperlink = "https://www.linkedin.com/in/romainbadibanga/"
 
@@ -154,12 +158,24 @@ def create_pdf_export(title, data_dict, summary_metrics=None):
     # --- Footer ---
     c.setFont("Helvetica-Oblique", 8)
     c.setFillColor(colors.grey)
-    footer_text = "Developed with Love by Romain Badibanga"
-    c.drawCentredString(width/2, 1.5*cm, footer_text)
+    text_part1 = "Developed with ❤️ by "
+    w_part1 = c.stringWidth(text_part1, "Helvetica-Oblique", 8)
     
-    # Lien LinkedIn cliquable
-    c.linkURL("https://www.linkedin.com/in/romainbadibanga/", (width/2 - 3*cm, 1.3*cm, width/2 + 3*cm, 1.7*cm), relative=0)
+    # Position du début du texte pour centrer l'ensemble
+    full_text = text_part1 + "Romain Badibanga"
+    w_full = c.stringWidth(full_text, "Helvetica-Oblique", 8)
+    start_x = (width - w_full) / 2
     
+    c.drawString(start_x, 1.5*cm, text_part1)
+    
+    # Nom en Bleu
+    c.setFillColor(colors.hexColor("#007CF0"))
+    c.drawString(start_x + w_part1, 1.5*cm, "Romain Badibanga")
+    
+    # Lien LinkedIn cliquable sur le nom
+    c.linkURL("https://www.linkedin.com/in/romainbadibanga/", (start_x + w_part1, 1.3*cm, start_x + w_full, 1.7*cm), relative=0)
+    
+    c.setFillColor(colors.grey)
     c.drawCentredString(width/2, 1.1*cm, "mentor.sc.app@gmail.com - Rapport généré par l'application Mentor SC")
 
     c.save()

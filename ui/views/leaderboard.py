@@ -27,6 +27,19 @@ def render_leaderboard():
     # Transformation en DataFrame pour un bel affichage
     df = pd.DataFrame(users, columns=["Expert", "Niveau", "Score Prestige", "Ville", "Dernière Activité"])
     
+    # Mapping des noms de niveaux (Grades)
+    grade_map = {
+        1: "🔰 Opérateur",
+        2: "📦 Coordinateur",
+        3: "🌐 Architecte",
+        4: "🏭 Directeur (COO)",
+        5: "👑 Visionnaire"
+    }
+    df['Grade'] = df['Niveau'].map(grade_map)
+    
+    # Réorganisation des colonnes pour mettre le Grade en avant
+    df = df[["Expert", "Grade", "Niveau", "Score Prestige", "Ville", "Dernière Activité"]]
+    
     # Ajout du rang
     df.index = range(1, len(df) + 1)
     df.index.name = "Rang"

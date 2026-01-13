@@ -12,4 +12,5 @@ streamlit-lottie
 Pillow
 reportlab
 supabase
-duckduckgo_search
+duckduckgo_searchscipy
+numpy

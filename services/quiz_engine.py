@@ -81,33 +81,44 @@ class QuizEngine:
         return self._fetch_specific(level_filter, None, uid, False)
 
     def _fetch_specific(self, lvl, pos, uid, fresh):
-        clause = f"WHERE level={lvl}"
-        if pos: clause += f" AND triad_position={pos}"
-        if fresh: clause += " AND triad_id NOT LIKE 'GOLDEN%'"
+        # 1. Récupérer tous les concepts (triades) disponibles pour ce niveau
+        query_triads = f"SELECT DISTINCT triad_id FROM question_bank WHERE level={lvl}"
+        if fresh: query_triads += " AND triad_id NOT LIKE 'GOLDEN%'"
         
-        # On tire un lot de questions potentielles en une seule requête (VITESSE)
-        query = f"""
-            SELECT id, category, concept, level, question, options, correct, explanation, theory, example, tip 
-            FROM question_bank 
-            {clause} 
-            ORDER BY RANDOM() LIMIT 20
-        """
-        res_list = run_query(query, fetch_all=True)
-        if not res_list: return None
-
-        for res in res_list:
-            q_id = res[0]
-            h = hashlib.md5(res[4].encode()).hexdigest()
-            
-            # Vérification historique permanent (réussies)
-            if run_query('SELECT 1 FROM history WHERE user_id=? AND question_hash=?', (uid, h), fetch_one=True):
-                continue
+        triads = [r[0] for r in run_query(query_triads, fetch_all=True) if r[0]]
+        if not triads: return None
+        
+        random.shuffle(triads) # Diversité des sujets
+        
+        for tid in triads:
+            # 2. Pour chaque triade, trouver la progression de l'utilisateur
+            # On cherche quelle est la première position (1, 2 ou 3) non réussie
+            for position in [1, 2, 3]:
+                # Récupérer la question à cette position
+                q_res = run_query(f"SELECT id, question, options, correct, explanation, theory, example, tip, category, concept FROM question_bank WHERE triad_id=? AND triad_position=?", (tid, position), fetch_one=True)
                 
-            # Vérification échecs récents
-            if run_query('SELECT 1 FROM recent_failures WHERE user_id=? AND question_id=?', (uid, q_id), fetch_one=True):
-                continue
-            
-            return {"id":q_id,"category":res[1],"concept_key":res[2],"question":res[4],"options":json.loads(res[5]),"correct":res[6],"explanation":res[7],"theory":res[8],"example":res[9],"tip":res[10]}
+                if q_res:
+                    q_id, q_text, q_opts, q_corr, q_expl, q_theo, q_ex, q_tip, q_cat, q_conc = q_res
+                    h = hashlib.md5(q_text.encode()).hexdigest()
+                    
+                    # Est-ce que cette question est déjà réussie ?
+                    is_solved = run_query('SELECT 1 FROM history WHERE user_id=? AND question_hash=?', (uid, h), fetch_one=True)
+                    
+                    if not is_solved:
+                        # C'est la question "suivante" logique pour ce concept.
+                        # On vérifie juste qu'elle n'a pas été échouée il y a moins de 24h
+                        if run_query('SELECT 1 FROM recent_failures WHERE user_id=? AND question_id=?', (uid, q_id), fetch_one=True):
+                            break # On arrête pour ce concept aujourd'hui, on passe au triad_id suivant
+                        
+                        return {
+                            "id": q_id, "category": q_cat, "concept_key": q_conc,
+                            "question": q_text, "options": json.loads(q_opts),
+                            "correct": q_corr, "explanation": q_expl,
+                            "theory": q_theo, "example": q_ex, "tip": q_tip
+                        }
+                    else:
+                        # Si réussie, on continue la boucle pour voir la position suivante (2 ou 3)
+                        continue
         
         return None
 

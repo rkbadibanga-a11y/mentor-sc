@@ -256,4 +256,7 @@ def init_db():
     run_query("DELETE FROM recent_failures WHERE timestamp < datetime('now', '-1 day')", commit=True)
 
 def get_leaderboard():
-    return run_query('SELECT name, total_score, level FROM users ORDER BY total_score DESC LIMIT 5', fetch_all=True)
+
+    """Récupère les meilleurs utilisateurs triés par Niveau puis par Score."""
+
+    return run_query('SELECT name, total_score, level FROM users ORDER BY level DESC, total_score DESC LIMIT 10', fetch_all=True)

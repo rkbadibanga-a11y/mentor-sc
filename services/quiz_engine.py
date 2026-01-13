@@ -82,45 +82,46 @@ class QuizEngine:
         return self._fetch_specific(level_filter, None, uid, False)
 
     def _fetch_specific(self, lvl, pos, uid, fresh):
-        # 1. Récupérer tous les concepts (triades) disponibles pour ce niveau
-        query_triads = f"SELECT DISTINCT triad_id FROM question_bank WHERE level={lvl}"
-        if fresh: query_triads += " AND triad_id NOT LIKE 'GOLDEN%'"
+        # Optimisation : On récupère d'abord toutes les questions réussies de l'user (Cache local pour la fonction)
+        solved_hashes = [r[0] for r in run_query('SELECT question_hash FROM history WHERE user_id=?', (uid,), fetch_all=True)]
+        recent_fails = [r[0] for r in run_query('SELECT question_id FROM recent_failures WHERE user_id=?', (uid,), fetch_all=True)]
         
-        triads = [r[0] for r in run_query(query_triads, fetch_all=True) if r[0]]
-        if not triads: return None
+        # 1. Récupérer toutes les questions potentielles du niveau en UNE SEULE requête
+        query = f"SELECT id, question, options, correct, explanation, theory, example, tip, category, concept, triad_id, triad_position FROM question_bank WHERE level={lvl}"
+        if fresh: query += " AND triad_id NOT LIKE 'GOLDEN%'"
         
-        random.shuffle(triads) # Diversité des sujets
+        all_questions = run_query(query, fetch_all=True)
+        if not all_questions: return None
         
-        for tid in triads:
-            # 2. Pour chaque triade, trouver la progression de l'utilisateur
-            # On cherche quelle est la première position (1, 2 ou 3) non réussie
+        # 2. Organiser par Triade en local (Vitesse ++ )
+        triades_map = {}
+        for q in all_questions:
+            tid = q[10]
+            if tid not in triades_map: triades_map[tid] = {}
+            triades_map[tid][q[11]] = q
+            
+        tids = list(triades_map.keys())
+        random.shuffle(tids)
+        
+        for tid in tids:
+            # Pour chaque triade, on cherche la progression
             for position in [1, 2, 3]:
-                # Récupérer la question à cette position
-                q_res = run_query(f"SELECT id, question, options, correct, explanation, theory, example, tip, category, concept FROM question_bank WHERE triad_id=? AND triad_position=?", (tid, position), fetch_one=True)
-                
+                q_res = triades_map[tid].get(position)
                 if q_res:
-                    q_id, q_text, q_opts, q_corr, q_expl, q_theo, q_ex, q_tip, q_cat, q_conc = q_res
+                    q_id, q_text = q_res[0], q_res[1]
                     h = hashlib.md5(q_text.encode()).hexdigest()
                     
-                    # Est-ce que cette question est déjà réussie ?
-                    is_solved = run_query('SELECT 1 FROM history WHERE user_id=? AND question_hash=?', (uid, h), fetch_one=True)
-                    
-                    if not is_solved:
-                        # C'est la question "suivante" logique pour ce concept.
-                        # On vérifie juste qu'elle n'a pas été échouée il y a moins de 24h
-                        if run_query('SELECT 1 FROM recent_failures WHERE user_id=? AND question_id=?', (uid, q_id), fetch_one=True):
-                            break # On arrête pour ce concept aujourd'hui, on passe au triad_id suivant
+                    if h not in solved_hashes:
+                        if q_id in recent_fails:
+                            break # Concept bloqué pour 24h
                         
+                        # On a trouvé notre candidate !
                         return {
-                            "id": q_id, "category": q_cat, "concept_key": q_conc,
-                            "question": q_text, "options": json.loads(q_opts),
-                            "correct": q_corr, "explanation": q_expl,
-                            "theory": q_theo, "example": q_ex, "tip": q_tip
+                            "id": q_id, "category": q_res[8], "concept_key": q_res[9],
+                            "question": q_text, "options": json.loads(q_res[2]),
+                            "correct": q_res[3], "explanation": q_res[4],
+                            "theory": q_res[5], "example": q_res[6], "tip": q_res[7]
                         }
-                    else:
-                        # Si réussie, on continue la boucle pour voir la position suivante (2 ou 3)
-                        continue
-        
         return None
 
     def record_difficulty_vote(self, q_id, vote_type):

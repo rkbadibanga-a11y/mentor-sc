@@ -69,7 +69,48 @@ def show_badge_dialog(badge_data):
         st.session_state.pending_badge = None
         st.rerun()
 
+def render_stock_out():
+    st.markdown(f"""
+        <div style='text-align: center; background: rgba(239, 68, 68, 0.1); padding: 40px; border-radius: 20px; border: 2px solid #ef4444;'>
+            <div style='font-size: 6rem; margin-bottom: 20px;'>🚫</div>
+            <h1 style='color: #ef4444;'>RUPTURE DE STOCK !</h1>
+            <p style='font-size: 1.2rem;'>Vous n'avez plus de vies disponibles pour continuer la mission.</p>
+            <p>La Supply Chain est à l'arrêt.</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("❤️ Réapprovisionner (100 XP)", use_container_width=True, type="primary"):
+            if st.session_state.xp >= 100:
+                st.session_state.xp -= 100
+                st.session_state.hearts = 3
+                uid = st.session_state.user_id
+                run_query('UPDATE users SET hearts=3, xp=xp-100 WHERE user_id=?', (uid,), commit=True)
+                st.success("Réapprovisionnement effectué ! +3 Vies")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("XP Insuffisante !")
+    
+    with c2:
+        if st.button("🙏 Demander une grâce au Mentor", use_container_width=True):
+            st.session_state.hearts = 1
+            st.session_state.redemptions = st.session_state.get('redemptions', 0) + 1
+            uid = st.session_state.user_id
+            run_query('UPDATE users SET hearts=1, redemptions=redemptions+1 WHERE user_id=?', (uid,), commit=True)
+            st.warning("Le Mentor vous accorde une dernière vie... Ne la gâchez pas.")
+            time.sleep(1)
+            st.rerun()
+
 def render_mission():
+    # --- CHECK STOCK OUT ---
+    if st.session_state.hearts <= 0:
+        render_stock_out()
+        return
+
     engine = get_quiz_engine()
     uid = st.session_state.user_id
     qc = st.session_state.q_count

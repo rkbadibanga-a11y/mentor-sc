@@ -9,170 +9,204 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 def render_tools():
     st.markdown("### 🛠️ Boîte à Outils Supply Chain")
-    st.markdown("Passez de la théorie à l'application. Calculez vos paramètres et exportez vos outils vers Excel.")
+    st.markdown("Passez de la théorie à l'application métier. Calculez, simulez et exportez.")
 
-    tab1, tab2 = st.tabs(["📊 Calculateur Stock de Sécurité", "📋 Templates & Formules"])
+    tabs = st.tabs([
+        "🛡️ Stock de Sécurité", 
+        "💰 Coût Complet (Landed Cost)", 
+        "📦 Poids Volumétrique",
+        "🚢 Sélecteur Incoterms",
+        "📊 ABC-XYZ & Formules"
+    ])
 
-    with tab1:
+    with tabs[0]:
         render_safety_stock_calculator()
 
-    with tab2:
+    with tabs[1]:
+        render_landed_cost_calculator()
+
+    with tabs[2]:
+        render_volumetric_calculator()
+    
+    with tabs[3]:
+        render_incoterm_selector()
+
+    with tabs[4]:
         render_templates_section()
 
+# --- 1. STOCK DE SÉCURITÉ ---
 def render_safety_stock_calculator():
-    st.subheader("🛡️ Calculateur de Stock de Sécurité")
-    st.info("Ce calculateur prend en compte l'incertitude de la demande ET la variabilité du délai fournisseur.")
+    st.subheader("🛡️ Calculateur de Stock de Sécurité (Modèle de King)")
+    st.info("Ce modèle combine l'incertitude de la demande ET la fiabilité du délai fournisseur.")
 
     col1, col2 = st.columns(2)
-
     with col1:
-        st.markdown("**📁 Données de Demande**")
-        avg_demand = st.number_input("Consommation moyenne (par jour)", value=100.0, step=1.0)
-        std_demand = st.number_input("Écart-type de la conso (variabilité)", value=20.0, step=1.0)
+        st.markdown("**📁 Demande**")
+        avg_demand = st.number_input("Conso moyenne / jour", value=100.0, step=1.0, key="ss_avg_d")
+        std_demand = st.number_input("Écart-type conso", value=20.0, step=1.0, key="ss_std_d")
         
-        st.markdown("**🚚 Données Fournisseur**")
-        lead_time = st.number_input("Délai de livraison moyen (jours)", value=10.0, step=1.0)
-        std_lead_time = st.number_input("Écart-type du délai (jours)", value=2.0, step=0.5)
+        st.markdown("**🚚 Fournisseur**")
+        lead_time = st.number_input("Délai moyen (jours)", value=10.0, step=1.0, key="ss_lt")
+        std_lead_time = st.number_input("Écart-type délai (jours)", value=2.0, step=0.5, key="ss_std_lt")
 
     with col2:
-        st.markdown("**🎯 Cible de Service**")
-        service_level = st.slider("Taux de Service cible (%)", min_value=80.0, max_value=99.9, value=95.0, step=0.1)
-        
-        # Calcul du coefficient Z
+        st.markdown("**🎯 Service**")
+        service_level = st.slider("Taux de Service cible (%)", 80.0, 99.9, 95.0, 0.1, key="ss_sl")
         z_score = norm.ppf(service_level / 100)
-        st.metric("Coefficient de sécurité (Z)", f"{z_score:.2f}")
+        st.metric("Coefficient Z", f"{z_score:.2f}")
 
-    # Calcul de la formule complexe
-    # SS = Z * sqrt( (LeadTime * StdDemand^2) + (AvgDemand^2 * StdLeadTime^2) )
-    term_demand = lead_time * (std_demand ** 2)
-    term_lead_time = (avg_demand ** 2) * (std_lead_time ** 2)
-    combined_std = np.sqrt(term_demand + term_lead_time)
+    combined_std = np.sqrt(lead_time * (std_demand ** 2) + (avg_demand ** 2) * (std_lead_time ** 2))
     safety_stock = z_score * combined_std
 
     st.markdown("---")
-    
     c1, c2, c3 = st.columns(3)
-    c1.metric("Stock de Sécurité", f"{int(np.ceil(safety_stock))} unités")
-    c2.metric("Point de Commande", f"{int(np.ceil(avg_demand * lead_time + safety_stock))} unités")
-    c3.metric("Stock Moyen", f"{int(np.ceil(safety_stock))} unités (hors stock cycle)")
+    c1.metric("Stock de Sécurité", f"{int(np.ceil(safety_stock))} u.")
+    c2.metric("Point de Commande", f"{int(np.ceil(avg_demand * lead_time + safety_stock))} u.")
+    c3.metric("Stock Moyen (SS)", f"{int(np.ceil(safety_stock))} u.")
 
-    with st.expander("🔍 Voir la formule appliquée"):
-        st.latex(r"SS = Z \times \sqrt{L \times \sigma_c^2 + C^2 \times \sigma_L^2}")
-        st.markdown(f"""
-        - **Z** (Coeff. Sécurité) : {z_score:.2f}
-        - **L** (Délai) : {lead_time} jours
-        - **σc** (Écart-type conso) : {std_demand}
-        - **C** (Conso moyenne) : {avg_demand}
-        - **σL** (Écart-type délai) : {std_lead_time}
+    if st.button("📥 Générer Excel Stock de Sécurité", use_container_width=True):
+        output = create_ss_excel(avg_demand, std_demand, lead_time, std_lead_time, service_level, safety_stock, z_score)
+        st.download_button("💾 Télécharger SS.xlsx", output, "MentorSC_Stock_Securite.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+# --- 2. LANDED COST (COÛT COMPLET) ---
+def render_landed_cost_calculator():
+    st.subheader("💰 Comparateur de Coût Complet (Landed Cost)")
+    st.write("Comparez deux sources d'approvisionnement en incluant les coûts cachés.")
+
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### 🇨🇳 Source A (Ex: Grand Import)")
+        price_a = st.number_input("Prix unitaire (Ex-Works)", value=10.0, key="lc_p_a")
+        freight_a = st.number_input("Fret unitaire", value=2.5, key="lc_f_a")
+        customs_a = st.number_input("Droits de douane (%)", value=6.5, key="lc_c_a")
+        lead_time_a = st.number_input("Temps de transport (jours)", value=45, key="lc_lt_a")
+
+    with col2:
+        st.markdown("### 🇪🇺 Source B (Ex: Proche Import)")
+        price_b = st.number_input("Prix unitaire (Ex-Works)", value=14.0, key="lc_p_b")
+        freight_b = st.number_input("Fret unitaire", value=0.8, key="lc_f_b")
+        customs_b = st.number_input("Droits de douane (%)", value=0.0, key="lc_c_b")
+        lead_time_b = st.number_input("Temps de transport (jours)", value=5, key="lc_lt_b")
+
+    st.markdown("---")
+    cost_capital = st.slider("Taux de possession annuel (%)", 5.0, 30.0, 15.0, 1.0) / 100
+
+    # Calculs
+    def calc_landed(p, f, c, lt):
+        duties = (p + f) * (c / 100)
+        # Coût financier du stock en transit
+        financial_cost = (p + f + duties) * cost_capital * (lt / 365)
+        total = p + f + duties + financial_cost
+        return total, duties, financial_cost
+
+    total_a, duty_a, fin_a = calc_landed(price_a, freight_a, customs_a, lead_time_a)
+    total_b, duty_b, fin_b = calc_landed(price_b, freight_b, customs_b, lead_time_b)
+
+    res1, res2 = st.columns(2)
+    res1.metric("Total Landed A", f"{total_a:.2f} €", f"{((total_a/total_b)-1)*100:+.1f}% vs B")
+    res2.metric("Total Landed B", f"{total_b:.2f} €", f"{((total_b/total_a)-1)*100:+.1f}% vs A")
+
+    with st.expander("📊 Détail des coûts unitaires"):
+        st.write(pd.DataFrame({
+            "Poste de coût": ["Prix Achat", "Fret", "Douane", "Portage Financier", "TOTAL"],
+            "Source A": [f"{price_a}€", f"{freight_a}€", f"{duty_a:.2f}€", f"{fin_a:.2f}€", f"{total_a:.2f}€"],
+            "Source B": [f"{price_b}€", f"{freight_b}€", f"{duty_b:.2f}€", f"{fin_b:.2f}€", f"{total_b:.2f}€"]
+        }))
+
+# --- 3. POIDS VOLUMÉTRIQUE ---
+def render_volumetric_calculator():
+    st.subheader("📦 Calculateur de Poids Volumétrique")
+    st.write("Le transporteur facture au plus élevé entre le poids réel et le volume.")
+
+    c1, c2, c3 = st.columns(3)
+    length = c1.number_input("Longueur (cm)", 1.0, 300.0, 60.0)
+    width = c2.number_input("Largeur (cm)", 1.0, 300.0, 40.0)
+    height = c3.number_input("Hauteur (cm)", 1.0, 300.0, 40.0)
+    
+    real_weight = st.number_input("Poids Réel (kg)", 0.1, 1000.0, 15.0)
+    mode = st.radio("Mode de transport", ["Aérien (1:6)", "Route (1:3)", "Maritime (1:1)"], horizontal=True)
+
+    ratios = {"Aérien (1:6)": 6000, "Route (1:3)": 3000, "Maritime (1:1)": 1000}
+    ratio = ratios[mode]
+    
+    vol_weight = (length * width * height) / (ratio if mode != "Maritime (1:1)" else 1000)
+    if mode == "Maritime (1:1)": vol_weight = (length * width * height) / 1000000 * 1000 # 1m3 = 1000kg
+
+    st.markdown("---")
+    res_c1, res_c2 = st.columns(2)
+    res_c1.metric("Poids Volumétrique", f"{vol_weight:.2f} kg")
+    
+    is_vol = vol_weight > real_weight
+    taxable = max(vol_weight, real_weight)
+    
+    color = "red" if is_vol else "green"
+    st.markdown(f"""
+    <div style="padding:20px; border-radius:10px; border:2px solid {color}; text-align:center;">
+        <h3 style="color:{color};">Poids Taxable : {taxable:.2f} kg</h3>
+        <p>{"⚠️ Attention : Vous payez pour du volume (votre colis est 'léger')." if is_vol else "✅ Optimal : Vous payez pour le poids réel."}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- 4. INCOTERMS ---
+def render_incoterm_selector():
+    st.subheader("🚢 Sélecteur d'Incoterm Idéal")
+    st.write("Répondez à 3 questions pour trouver l'Incoterm adapté à votre stratégie.")
+
+    q1 = st.toggle("Je veux maîtriser le coût et le choix du transporteur international")
+    q2 = st.toggle("Je veux que le fournisseur gère toutes les formalités de douane import")
+    q3 = st.toggle("Je veux limiter mes risques au maximum (livraison chez moi)")
+
+    st.markdown("---")
+    if q3 or q2:
+        st.success("🎯 Recommandation : **DDP (Delivered Duty Paid)**")
+        st.write("Le fournisseur s'occupe de tout jusqu'à votre porte. Confort maximal, mais coût caché probable.")
+    elif q1:
+        st.success("🎯 Recommandation : **FOB (Free On Board)** ou **FCA**")
+        st.write("Vous maîtrisez la chaîne logistique dès le départ du pays d'origine. Idéal pour optimiser les coûts.")
+    else:
+        st.info("🎯 Recommandation : **EXW (Ex-Works)**")
+        st.write("Le fournisseur met juste à disposition. Attention : vous gérez la douane export dans un pays étranger !")
+
+# --- 5. ABC-XYZ & TEMPLATES ---
+def render_templates_section():
+    st.subheader("📊 Segmentation & Formules")
+    
+    with st.expander("📐 Aide à la décision ABC-XYZ"):
+        st.write("""
+        | Catégorie | XYZ (Prévisibilité) | Stratégie Recommandée |
+        | :--- | :--- | :--- |
+        | **AX** | Stable | Automatisation, Flux tendu, Stock bas. |
+        | **AZ** | Imprévisible | **Risque Obsolescence**. Make-to-order ou Centralisation. |
+        | **CX** | Stable | Stockage de masse (C'est pas cher). |
+        | **CZ** | Imprévisible | Stock de sécurité élevé pour éviter les irritants. |
         """)
 
-    # Export Excel
-    st.markdown("#### 📥 Exporter vers Excel")
-    if st.button("Générer mon outil Excel personnalisé", use_container_width=True):
-        output = create_excel_template(avg_demand, std_demand, lead_time, std_lead_time, service_level, safety_stock, z_score)
-        st.download_button(
-            label="💾 Télécharger le fichier .xlsx",
-            data=output,
-            file_name="Calculateur_Stock_Securite_MentorSC.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+    st.markdown("#### 📋 Bibliothèque de Formules")
+    formulas = [
+        {"name": "Wilson (EOQ)", "code": "=SQRT((2*Demande*Cout_Commande)/Cout_Stockage)", "desc": "Quantité optimale de commande."},
+        {"name": "Taux de Rotation", "code": "=Ventes_Annuelles / Stock_Moyen", "desc": "Nombre de fois où le stock est renouvelé."},
+        {"name": "Délai de Couverture", "code": "= (Stock_Actuel / Conso_Moyenne_Jour)", "desc": "Autonomie du stock en jours."}
+    ]
+    for f in formulas:
+        st.text(f["name"])
+        st.code(f["code"], language="excel")
+        st.caption(f["desc"])
 
-def create_excel_template(avg_c, std_c, lt, std_lt, sl, ss, z):
+# --- HELPERS EXCEL ---
+def create_ss_excel(avg_c, std_c, lt, std_lt, sl, ss, z):
     output = io.BytesIO()
     wb = Workbook()
     ws = wb.active
     ws.title = "Calculateur SS"
-
-    # Styles
-    header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True)
-    input_fill = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
-    result_fill = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
-    border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-
-    # Titre
-    ws['B2'] = "OUTIL DE CALCUL STOCK DE SÉCURITÉ - MENTOR SC"
-    ws['B2'].font = Font(size=14, bold=True)
-    
-    # Entrées
-    ws['B4'] = "PARAMÈTRES D'ENTRÉE"
-    ws['B4'].font = Font(bold=True)
-    
-    data = [
-        ("Consommation moyenne (jour)", avg_c, "Unités"),
-        ("Écart-type consommation", std_c, "Unités"),
-        ("Délai de livraison moyen", lt, "Jours"),
-        ("Écart-type délai", std_lt, "Jours"),
-        ("Taux de Service cible", sl/100, "Pourcentage"),
-    ]
-    
-    for i, (label, val, unit) in enumerate(data):
-        row = 5 + i
-        ws.cell(row=row, column=2, value=label).border = border
-        cell_val = ws.cell(row=row, column=3, value=val)
-        cell_val.border = border
-        cell_val.fill = input_fill
-        if label == "Taux de Service cible":
-            cell_val.number_format = '0.0%'
-        ws.cell(row=row, column=4, value=unit).border = border
-
-    # Résultats
-    ws['B12'] = "RÉSULTATS CALCULÉS"
-    ws['B12'].font = Font(bold=True)
-    
-    ws['B13'] = "Coefficient Z"
-    ws['C13'] = z
-    ws['B14'] = "Stock de Sécurité"
-    ws['C14'] = "=C13*SQRT(C7*C6^2 + C5^2*C8^2)"
-    ws['D14'] = "Unités"
-    
-    for r in range(13, 15):
-        ws.cell(row=r, column=2).border = border
-        c = ws.cell(row=r, column=3)
-        c.border = border
-        c.fill = result_fill
-        ws.cell(row=r, column=4).border = border
-
-    ws['B16'] = "💡 Note : Ce fichier utilise la formule de King qui combine les deux incertitudes."
-    ws['B16'].font = Font(italic=True, size=9)
-
-    # Ajustement colonnes
-    ws.column_dimensions['B'].width = 30
-    ws.column_dimensions['C'].width = 15
-
+    # (Style simplifiés pour la rapidité)
+    ws['B2'] = "OUTIL STOCK DE SÉCURITÉ"
+    ws['B4'], ws['C4'] = "Paramètre", "Valeur"
+    ws.append(["", "Conso Moy", avg_c])
+    ws.append(["", "Ecart-type Conso", std_c])
+    ws.append(["", "Delai Moy", lt])
+    ws.append(["", "Ecart-type Delai", std_lt])
+    ws.append(["", "Z Score", z])
+    ws.append(["", "STOCK SÉCURITÉ", ss])
     wb.save(output)
     return output.getvalue()
-
-def render_templates_section():
-    st.subheader("📋 Liste des Formules Magiques")
-    st.write("Copiez ces formules directement dans votre ERP ou Excel.")
-
-    formulas = [
-        {
-            "name": "Quantité Économique (Wilson)",
-            "formula": "SQRT((2 * Demande Annuelle * Coût Commande) / Coût Stockage)",
-            "use": "Optimiser la taille des lots d'achat."
-        },
-        {
-            "name": "Taux de Rotation des Stocks",
-            "formula": "Consommation Annuelle / Stock Moyen",
-            "use": "Mesurer la performance financière du stock."
-        },
-        {
-            "name": "Taux de Service (Type 1)",
-            "formula": "(Commandes livrées à temps) / (Total commandes reçues)",
-            "use": "Mesurer la fiabilité logistique."
-        }
-    ]
-
-    for f in formulas:
-        with st.expander(f"🔹 {f['name']}"):
-            st.code(f["formula"], language="excel")
-            st.write(f"**Usage :** {f['use']}")
-            if st.button(f"Générer Template Excel - {f['name']}"):
-                st.info("Template en cours de préparation...")
-
-    st.markdown("---")
-    st.markdown("##### 📥 Téléchargements utiles")
-    st.button("📦 Template Inventaire Tournant (.xlsx)")
-    st.button("📊 Dashboard KPI Supply Chain (.xlsx)")

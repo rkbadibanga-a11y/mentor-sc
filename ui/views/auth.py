@@ -44,12 +44,30 @@ def render_login():
                             'data': None, 'question_queue': [], 'consecutive_wins': 0,
                             'active_tab': 'mission' # Force l'onglet Mission par défaut
                         })
-                        login_placeholder.empty()
+                        st.toast(f"Ravi de vous revoir, {res[1]} !")
+                        time.sleep(1)
                         st.rerun()
                     else:
                         st.session_state.temp_email = email
                         st.session_state.show_reg = True
                         st.rerun()
+
+        # --- NOUVEAU : LIEN MAGIQUE ---
+        with st.expander("🔗 J'ai déjà un compte mais je n'ai pas mon lien"):
+            email_magic = st.text_input("📧 Votre email de compte", key="magic_email")
+            if st.button("M'envoyer mon lien magique", use_container_width=True):
+                res = run_query('SELECT user_id, name FROM users WHERE email=?', (email_magic,), fetch_one=True)
+                if res:
+                    from services.email_service import send_email_notification
+                    magic_link = f"https://mentor-sc.streamlit.app/?uid={res[0]}"
+                    subject = "📦 Votre Lien Magique Mentor SC"
+                    body = f"Bonjour {res[1]},\n\nVoici votre accès direct à Mentor SC :\n{magic_link}\n\nEnregistrez ce lien dans vos favoris pour ne plus jamais perdre votre progression !"
+                    
+                    success, _ = send_email_notification(subject, body)
+                    if success: st.success("Lien envoyé ! Vérifiez votre boîte mail.")
+                    else: st.error("Erreur d'envoi. Contactez mentor.sc.app@gmail.com")
+                else:
+                    st.error("Aucun compte trouvé avec cet email.")
         
         if st.session_state.get('show_reg'):
             with st.form("reg"):

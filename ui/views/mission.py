@@ -213,4 +213,15 @@ def render_mission():
             if c3.button("💡 Astuce", key=f"bi_{qh}", use_container_width=True): st.session_state[f"si_{qh}"] = not st.session_state[f"si_{qh}"]
             if st.session_state[f"st_{qh}"]: st.info(get_c(q, 'theory'))
             if st.session_state[f"se_{qh}"]: st.success(get_c(q, 'example'))
-            if st.session_state[f"si_{qh}"]: st.warning(get_c(q, 'tip'))
+                        if st.session_state[f"si_{qh}"]: st.warning(get_c(q, 'tip'))
+                    
+                    # --- NOUVEAU : VOTES DIFFICULTÉ ---
+                    st.write("<small>Cette question est :</small>", unsafe_allow_html=True)
+                    cv1, cv2, cv3 = st.columns([0.3, 0.3, 0.4])
+                    if cv1.button("🔥 Trop dure", key=f"hard_{qh}", use_container_width=True):
+                        engine.record_difficulty_vote(q['id'], "hard")
+                        st.toast("Merci ! L'IA va s'adapter.", icon="🧠")
+                    if cv2.button("✅ Trop facile", key=f"easy_{qh}", use_container_width=True):
+                        engine.record_difficulty_vote(q['id'], "easy")
+                        st.toast("Noté ! On va monter le niveau.", icon="📈")
+            

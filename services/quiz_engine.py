@@ -81,38 +81,44 @@ class QuizEngine:
         return self._fetch_specific(level_filter, None, uid, False)
 
     def _fetch_specific(self, lvl, pos, uid, fresh):
-        if 'session_seen_ids' not in st.session_state:
-            st.session_state.session_seen_ids = []
-            
+        # Nettoyage des vieux échecs (plus de 24h)
+        run_query("DELETE FROM recent_failures WHERE timestamp < datetime('now', '-1 day')", commit=True)
+        
         clause = f"WHERE level={lvl}"
         if pos: clause += f" AND triad_position={pos}"
         if fresh: clause += " AND triad_id NOT LIKE 'GOLDEN%'"
         
-        # On augmente le pool de recherche pour avoir plus de choix
-        query = f"SELECT id, category, concept, level, question, options, correct, explanation, theory, example, tip FROM question_bank {clause} ORDER BY RANDOM() LIMIT 10"
-        
+        # Tirage de 15 questions pour avoir du choix
+        query = f"SELECT id, category, concept, level, question, options, correct, explanation, theory, example, tip FROM question_bank {clause} ORDER BY RANDOM() LIMIT 15"
         res_list = run_query(query, fetch_all=True)
         if not res_list: return None
 
-        # On cherche une question qui n'est :
-        # 1. Ni dans l'historique permanent (réussies)
-        # 2. Ni vue récemment dans cette session (même si ratée)
         for res in res_list:
+            q_id = res[0]
             h = hashlib.md5(res[4].encode()).hexdigest()
-            already_solved = run_query('SELECT 1 FROM history WHERE user_id=? AND question_hash=?', (uid, h), fetch_one=True)
-            is_recent = res[0] in st.session_state.session_seen_ids
             
-            if not already_solved and not is_recent:
-                # Marquer comme vue dans cette session
-                st.session_state.session_seen_ids.append(res[0])
-                if len(st.session_state.session_seen_ids) > 40: # On garde les 40 dernières
-                    st.session_state.session_seen_ids.pop(0)
+            # 1. Historique permanent (réussies)
+            if run_query('SELECT 1 FROM history WHERE user_id=? AND question_hash=?', (uid, h), fetch_one=True):
+                continue
                 
-                return {"id":res[0],"category":res[1],"concept_key":res[2],"question":res[4],"options":json.loads(res[5]),"correct":res[6],"explanation":res[7],"theory":res[8],"example":res[9],"tip":res[10]}
+            # 2. Échecs récents (persistants en DB pour 24h)
+            if run_query('SELECT 1 FROM recent_failures WHERE user_id=? AND question_id=?', (uid, q_id), fetch_one=True):
+                continue
+            
+            return {"id":q_id,"category":res[1],"concept_key":res[2],"question":res[4],"options":json.loads(res[5]),"correct":res[6],"explanation":res[7],"theory":res[8],"example":res[9],"tip":res[10]}
         
-        # Si on n'a vraiment rien trouvé de "neuf", on prend la moins récente du lot de 10
-        res = res_list[0]
-        return {"id":res[0],"category":res[1],"concept_key":res[2],"question":res[4],"options":json.loads(res[5]),"correct":res[6],"explanation":res[7],"theory":res[8],"example":res[9],"tip":res[10]}
+        return None
+
+    def record_difficulty_vote(self, q_id, vote_type):
+        """Enregistre un vote 'Trop dur' ou 'Trop facile'."""
+        col = "hard_votes" if vote_type == "hard" else "easy_votes"
+        run_query(f"INSERT INTO difficulty_feedback (question_id, {col}) VALUES (?, 1) ON CONFLICT(question_id) DO UPDATE SET {col} = {col} + 1", (q_id,), commit=True)
+        
+        # Logique d'auto-régulation
+        if vote_type == "hard":
+            votes = run_query("SELECT hard_votes FROM difficulty_feedback WHERE question_id=?", (q_id,), fetch_one=True)
+            if votes and votes[0] >= 5: # Si 5 votes 'Trop dur'
+                run_query("UPDATE question_bank SET level = MIN(4, level + 1) WHERE id=?", (q_id,), commit=True)
 
     def prefetch_next_question(self):
         if st.session_state.get('prefetched_data') is None:
@@ -258,6 +264,9 @@ class QuizEngine:
             # Synchro des cœurs et activité en cas de défaite
             now_ts = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
             run_query('UPDATE users SET hearts=?, last_seen=? WHERE user_id=?', (st.session_state.hearts, now_ts, uid), commit=True)
+            
+            # Enregistrer l'échec pour éviter de revoir la question pendant 24h
+            run_query('INSERT OR IGNORE INTO recent_failures (user_id, question_id) VALUES (?, ?)', (uid, q_data['id']), commit=True)
             play_sfx("error")
 
 def get_quiz_engine(): return QuizEngine()

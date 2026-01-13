@@ -14,7 +14,8 @@ reportlab
 supabase
 duckduckgo_search
 scipy
-numpyextra-streamlit-components
+numpy
+extra-streamlit-components
 streamlit-google-auth
 google-auth
 google-auth-oauthlib

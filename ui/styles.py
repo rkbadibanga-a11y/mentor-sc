@@ -20,16 +20,69 @@ def apply_styles():
         }}
         
         /* CARDS & BOXES */
+        .stMetric {{
+            background: rgba(30, 41, 59, 0.4);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }}
+        
+        .main-card {{
+            background: rgba(30, 41, 59, 0.4);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid #334155;
+            margin-bottom: 20px;
+        }}
+
         .question-box {{ 
-            background: {COLORS['card_bg']}; 
+            background: rgba(30, 41, 59, 0.6); 
             backdrop-filter: blur(12px); 
-            padding: 30px; 
-            border-radius: 15px; 
-            border-left: 5px solid {COLORS['secondary']}; 
-            margin-bottom: 20px; 
-            font-size: 1.35rem; 
+            padding: 35px; 
+            border-radius: 20px; 
+            border-left: 6px solid {COLORS['secondary']}; 
+            margin-bottom: 25px; 
+            font-size: 1.4rem; 
             font-weight: 600; 
-            line-height: 1.5;
+            line-height: 1.6;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }}
+
+        /* HEADERS */
+        h1, h2, h3 {{
+            color: #f1f5f9 !important;
+            font-weight: 800 !important;
+            letter-spacing: -0.5px !important;
+        }}
+        
+        .section-header {{
+            color: {COLORS['primary']} !important;
+            font-size: 0.8rem !important;
+            font-weight: 700 !important;
+            letter-spacing: 2px !important;
+            text-transform: uppercase !important;
+            margin-top: 30px !important;
+            margin-bottom: 15px !important;
+            opacity: 0.8;
+        }}
+
+        /* SIDEBAR NAVIGATION */
+        section[data-testid="stSidebar"] .stButton > button {{
+            text-align: left !important;
+            justify-content: flex-start !important;
+            padding: 10px 15px !important;
+            font-size: 0.95rem !important;
+            border: 1px solid transparent !important;
+            margin-bottom: 4px !important;
+        }}
+        
+        section[data-testid="stSidebar"] .stButton > button[kind="primary"] {{
+            background: rgba(0, 223, 216, 0.1) !important;
+            border: 1px solid rgba(0, 223, 216, 0.3) !important;
+            color: {COLORS['primary']} !important;
+            font-weight: 600 !important;
+            box-shadow: none !important;
+            transform: none !important;
         }}
 
         /* BUTTONS STYLING */

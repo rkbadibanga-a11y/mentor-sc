@@ -149,7 +149,7 @@ def main():
         # 3. Navigation Principale
         menu = {
             "mission": "🎯 Mission", 
-            "coach": "💬 Mentor SC", 
+            "coach": "🧠 Audit Expert", 
             "process": "📚 Master Class", 
             "tools": "🛠️ Outils",
             "glossary": "📖 Glossaire", 

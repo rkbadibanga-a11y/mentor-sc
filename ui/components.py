@@ -48,6 +48,39 @@ def render_mentor_footer():
         st.session_state.last_spoken_msg = msg
         st.components.v1.html(f"<script>window.speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance({json.dumps(msg)}); u.lang='fr-FR'; window.speechSynthesis.speak(u);</script>", height=0)
 
+@st.dialog("Signaler une anomalie")
+def report_anomaly_dialog():
+    st.markdown("##### 🛠️ Rapport d'incident")
+    st.write("Dites-nous ce qui ne va pas. Votre message sera enregistré techniquement et vous pourrez également nous l'envoyer par email.")
+    
+    user_message = st.text_area("Précisions sur l'anomalie :", placeholder="Décrivez le problème ici (ex: erreur de calcul, bug d'affichage...)", height=150)
+    
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    
+    if col1.button("💾 Enregistrer", use_container_width=True):
+        if user_message:
+            from utils.maintenance import record_anomaly
+            record_anomaly(f"Signalement Manuel: {user_message}", context="Interface Sidebar Dialog")
+            st.toast("✅ Rapport enregistré !")
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.warning("Veuillez décrire l'anomalie.")
+
+    # Create mailto link
+    subject = f"Signalement d'anomalie - {st.session_state.user}"
+    body = f"Bonjour Romain,\n\nJe signale une anomalie sur Mentor SC :\n\n{user_message}\n\n---\nUtilisateur : {st.session_state.user}\nNiveau : {st.session_state.level}\nXP : {st.session_state.xp}"
+    mailto_link = f"mailto:r.k.badibanga@gmail.com?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
+    
+    col2.markdown(f'''
+        <a href="{mailto_link}" style="text-decoration: none;">
+            <div style="background-color: #ff4b4b; color: white; padding: 8px; border-radius: 5px; text-align: center; font-weight: bold; border: 1px solid #ff4b4b;">
+                📧 Envoyer Email
+            </div>
+        </a>
+    ''', unsafe_allow_html=True)
+
 def render_sidebar():
     lang = st.session_state.get('lang', 'Français')
     # 1. Engine Display
@@ -149,9 +182,8 @@ def render_sidebar():
         st.markdown("---")
         st.markdown("##### 🛠️ Maintenance")
         if st.button("🚨 Signaler une anomalie", use_container_width=True):
-            from utils.maintenance import record_anomaly
-            record_anomaly("Signalement Manuel de l'utilisateur", context="Interface Sidebar")
-            st.toast("✅ Rapport envoyé à l'Agent Gemini !")
+            report_anomaly_dialog()
+
 
         if st.button(t('purge', lang), type="primary", use_container_width=True):
             run_query("DELETE FROM users WHERE user_id=?", (st.session_state.user_id,), commit=True)

@@ -6,6 +6,7 @@ import datetime
 import streamlit as st
 import sys
 import time
+import urllib.parse
 
 REPORT_FILE = "GEMINI_FIX_REQUEST.json"
 
@@ -74,9 +75,25 @@ def render_error_screen(error):
     st.markdown("<br>", unsafe_allow_html=True)
     
     if st.button("🔧 GÉNÉRER UN TICKET DE RÉPARATION POUR GEMINI", type="primary", use_container_width=True):
-        file = record_anomaly(error)
-        st.success(f"✅ Rapport généré ({file}).")
-        st.info("💡 Échangez avec votre Agent Gemini et dites-lui simplement : **'Répare l'application'**.")
+        success = record_anomaly(error)
+        if success:
+            st.success("✅ Rapport technique généré.")
+            st.info("💡 Échangez avec votre Agent Gemini et dites-lui simplement : **'Répare l'application'**.")
+        else:
+            st.error("❌ Échec de la génération du rapport.")
+
+    # Option Email Direct
+    subject = "⚠️ CRASH Mentor SC"
+    body = f"Bonjour Romain,\n\nL'application a crashé.\n\nErreur : {str(error)}\n\n---\nUtilisateur : {st.session_state.get('user', 'Inconnu')}\nNiveau : {st.session_state.get('level', 'N/A')}"
+    mailto_link = f"mailto:r.k.badibanga@gmail.com?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
+    
+    st.markdown(f'''
+        <a href="{mailto_link}" style="text-decoration: none;">
+            <div style="background-color: #ff4b4b; color: white; padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; border: 1px solid #ff4b4b; margin-bottom: 10px;">
+                📧 Envoyer un rapport par Email
+            </div>
+        </a>
+    ''', unsafe_allow_html=True)
     
     if st.button("🔄 Tenter de rafraîchir", use_container_width=True):
         st.components.v1.html("<script>window.parent.location.reload();</script>", height=0)

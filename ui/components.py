@@ -91,7 +91,8 @@ INFOS TECHNIQUES :
 - XP : {st.session_state.xp}
 - Onglet actif : {st.session_state.get('active_tab', 'unknown')}
 """
-                if send_email_notification(subject, body):
+                success, status_msg = send_email_notification(subject, body)
+                if success:
                     # On enregistre aussi techniquement
                     from utils.maintenance import record_anomaly
                     record_anomaly(f"Signalement Direct (Email: {user_email_input}): {user_message}", context="Sidebar Dialog")
@@ -99,7 +100,7 @@ INFOS TECHNIQUES :
                     time.sleep(2)
                     st.rerun()
                 else:
-                    st.error("❌ Erreur lors de l'envoi. Vérifiez la configuration SMTP.")
+                    st.error(f"❌ Échec de l'envoi : {status_msg}")
         elif not user_email_input:
             st.warning("Veuillez renseigner votre email pour qu'on puisse vous répondre.")
         else:

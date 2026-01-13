@@ -31,7 +31,7 @@ def render_leaderboard():
     grade_map = {
         1: "🔰 Opérateur",
         2: "📦 Coordinateur",
-        3: "🌐 Architecte",
+        3: "⚙️ Ingénieur SC",
         4: "🏭 Directeur (COO)",
         5: "👑 Visionnaire"
     }

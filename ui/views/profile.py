@@ -33,7 +33,7 @@ def get_earned_badges_list(uid):
         ("📦", "Resp. Exploitation", qc >= 120),
         ("🚚", "Coordinateur Flux", lvl >= 2),
         ("📊", "Planificateur Confirmé", qc >= 250),
-        ("🌐", "Architecte Réseau", lvl >= 3),
+        ("⚙️", "Ingénieur SC", lvl >= 3),
         ("🔮", "Data Strategist SC", qc >= 380),
         ("🏭", "COO (Directeur Ops)", lvl >= 4),
         ("👑", "Visionnaire SC", qc >= 500),
@@ -118,7 +118,7 @@ def render_profile(uid: str):
         ("📈 Rangs de Carrière", [
             ("🔰", "Opérateur SC", "5 questions"), ("📦", "Resp. Exploitation", "Niv 1"),
             ("🚚", "Coordinateur Flux", "Niv 2 atteint"), ("📊", "Planificateur Confirmé", "Niv 2 fini"),
-            ("🌐", "Architecte Réseau", "Niv 3 atteint"), ("🔮", "Data Strategist SC", "Niv 3 fini"),
+            ("⚙️", "Ingénieur SC", "Niv 3 atteint"), ("🔮", "Data Strategist SC", "Niv 3 fini"),
             ("🏭", "COO (Directeur Ops)", "Niv 4 atteint"), ("👑", "Visionnaire SC", "Titre Ultime")
         ]),
         ("🎯 Spécialisations", [

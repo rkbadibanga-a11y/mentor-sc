@@ -58,8 +58,9 @@ class QuizEngine:
         now = time.time()
         if st.session_state.get('refill_in_progress') and (now - st.session_state.get('last_refill_time', 0)) < 5: return
         lvl = st.session_state.level
+        # On passe le seuil à 100 questions fraîches pour garantir la variété (X3 sécurisé)
         fresh = run_query("SELECT COUNT(*) FROM question_bank WHERE level=? AND triad_id NOT LIKE 'GOLDEN%'", (lvl,), fetch_one=True)[0]
-        if fresh > 20: return
+        if fresh > 100: return
         st.session_state.refill_in_progress = True; st.session_state.last_refill_time = now
         mn, _, _, _ = self.get_current_module_info(st.session_state.q_count)
         def task():

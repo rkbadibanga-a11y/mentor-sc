@@ -8,7 +8,7 @@ def render_admin_dashboard():
     st.title("👨‍💼 Tableau de Bord Administrateur")
     st.markdown("Vue exhaustive des utilisateurs et de leurs interactions.")
 
-    tab1, tab2 = st.tabs(["👥 Liste des Utilisateurs", "📩 Feedbacks & Messages"])
+    tab1, tab2, tab3 = st.tabs(["👥 Liste des Utilisateurs", "📩 Feedbacks & Messages", "🛠️ Maintenance & Stock"])
 
     with tab1:
         st.subheader("Base Utilisateurs")
@@ -41,3 +41,21 @@ def render_admin_dashboard():
                 st.rerun()
         else:
             st.info("Aucun message reçu pour le moment.")
+
+    with tab3:
+        st.subheader("État de la Banque de Questions")
+        stats = run_query("SELECT level, COUNT(*) FROM question_bank GROUP BY level", fetch_all=True)
+        if stats:
+            df_stats = pd.DataFrame(stats, columns=["Niveau", "Nombre de Questions"])
+            st.bar_chart(df_stats.set_index("Niveau"))
+            st.table(df_stats)
+        
+        st.markdown("---")
+        st.markdown("##### 🚀 Remplissage Manuel (X3)")
+        st.write("Cette opération va générer 5 nouvelles triades (15 questions) pour chaque module du curriculum via l'IA.")
+        if st.button("🔥 Lancer le Stockage Massif", use_container_width=True):
+            from services.stocker import stock_database
+            with st.status("Génération en cours (cela peut prendre 2-3 minutes)..."):
+                stock_database()
+            st.success("Banque de questions enrichie avec succès !")
+            st.rerun()

@@ -169,7 +169,7 @@ def create_pdf_export(title, data_dict, summary_metrics=None):
     c.drawString(start_x, 1.5*cm, text_part1)
     
     # Nom en Bleu
-    c.setFillColor(colors.hexColor("#007CF0"))
+    c.setFillColor(colors.HexColor("#007CF0"))
     c.drawString(start_x + w_part1, 1.5*cm, "Romain Badibanga")
     
     # Lien LinkedIn cliquable sur le nom

@@ -128,7 +128,8 @@ def render_sidebar():
     
     st.markdown(f'''
         <div style="text-align:center;">
-            <div style="font-size: 3rem; margin-bottom: 5px;">📦</div>
+            <div style="font-size: 3rem; margin-bottom: 0px;">📦</div>
+            <div style="font-size: 1.2rem; font-weight: 800; color: #00dfd8; margin-bottom: 15px; letter-spacing: 1px;">MENTOR SC</div>
             <h3>👤 {st.session_state.user}</h3>
             <div style="background:rgba(30, 41, 59, 0.5); padding:8px; border-radius:12px; margin-top:5px; border:1px solid #334155; display: flex; align-items: center; justify-content: center; gap: 8px;">
                 <span style="color:{status_color}; font-size: 1.2rem;">●</span> 

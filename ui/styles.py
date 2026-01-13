@@ -5,6 +5,17 @@ from core.config import COLORS
 def apply_styles():
     st.markdown(f"""
     <style>
+        /* PREVENT HORIZONTAL SCROLL */
+        html, body {{
+            max-width: 100%;
+            overflow-x: hidden !important;
+        }}
+        
+        [data-testid="stAppViewContainer"] {{
+            max-width: 100vw;
+            overflow-x: hidden !important;
+        }}
+
         .stApp {{ 
             background: radial-gradient(circle at top right, #1e293b, #0f172a); 
             color: {COLORS['text']}; 

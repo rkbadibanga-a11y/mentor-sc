@@ -14,4 +14,4 @@ reportlab
 supabase
 duckduckgo_search
 scipy
-numpy
+numpyextra-streamlit-components

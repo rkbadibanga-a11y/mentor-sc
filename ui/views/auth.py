@@ -32,6 +32,12 @@ def render_login():
                         res = run_query('SELECT * FROM users WHERE user_id=?', (user_id,), fetch_one=True)
                         
                         st.query_params["uid"] = user_id # Sauvegarder dans l'URL
+                        
+                        # --- MODERNE : COOKIE ---
+                        import extra_streamlit_components as stx
+                        cm = stx.CookieManager()
+                        cm.set('mentor_sc_uid', user_id, expires_at=None) # Expire dans 30 jours par défaut
+                        
                         st.session_state.update({
                             'auth':True, 'user_id':user_id, 'user':res[1], 'user_email': email, 'user_city': res[10],
                             'level':int(res[2] or 1), 'xp':int(res[3] or 0), 'total_score':int(res[4] or 0),

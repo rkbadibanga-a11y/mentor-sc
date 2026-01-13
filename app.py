@@ -28,6 +28,11 @@ def main():
     apply_styles()
     init_db()
 
+    # --- GESTION CALLBACK GOOGLE ---
+    if "code" in st.query_params:
+        from services.auth_google import handle_google_callback
+        handle_google_callback()
+
     # --- GESTION DES COOKIES (MODERNE) ---
     cookie_manager = stx.CookieManager()
     

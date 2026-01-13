@@ -15,3 +15,7 @@ supabase
 duckduckgo_search
 scipy
 numpyextra-streamlit-components
+streamlit-google-auth
+google-auth
+google-auth-oauthlib
+google-auth-httplib2

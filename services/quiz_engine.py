@@ -32,8 +32,19 @@ class QuizEngine:
         return CURRICULUM[lvl][-1][0], 1, 1, lvl
 
     def _generate_single_batch(self, lvl, mod_n, user, mastery, streak):
-        prompt = f"""Rôle: Expert Supply Chain. Concept module: {mod_n}. Niveau {lvl}/4.
-        Crée une Triade de 3 QCM progressifs: 1.Savoir, 2.Comprendre, 3.Appliquer.
+        # Définition de la difficulté pour le prompt
+        difficulty_guideline = ""
+        if lvl == 1:
+            difficulty_guideline = "Niveau DÉBUTANT : Focus sur les définitions, le vocabulaire de base et les concepts intuitifs. PAS de calculs complexes, uniquement de la logique simple."
+        elif lvl == 4:
+            difficulty_guideline = "Niveau EXPERT : Cas pratiques complexes, arbitrage de coûts (Trade-offs), stratégie CODIR et KPI avancés."
+        else:
+            difficulty_guideline = "Niveau INTERMÉDIAIRE : Application des formules standards et gestion opérationnelle."
+
+        prompt = f"""Rôle: Expert Supply Chain Pédagogue. Concept module: {mod_n}. Niveau {lvl}/4.
+        CONSIGNE DE DIFFICULTÉ : {difficulty_guideline}
+        
+        Crée une Triade de 3 QCM progressifs : 1.Savoir (Définition), 2.Comprendre (Pourquoi ?), 3.Appliquer (Cas pratique).
         JSON strict: [{{"question":"...", "options":{{"A":"..","B":"..","C":"..","D":".."}},"correct":"A","explanation":"...","category":"{mod_n}","concept_key":"..."}}]"""
         raw, engine = self.ai.get_response(prompt)
         if not raw: return [], engine
@@ -70,35 +81,38 @@ class QuizEngine:
         return self._fetch_specific(level_filter, None, uid, False)
 
     def _fetch_specific(self, lvl, pos, uid, fresh):
-        if 'recently_seen' not in st.session_state:
-            st.session_state.recently_seen = []
+        if 'session_seen_ids' not in st.session_state:
+            st.session_state.session_seen_ids = []
             
         clause = f"WHERE level={lvl}"
         if pos: clause += f" AND triad_position={pos}"
         if fresh: clause += " AND triad_id NOT LIKE 'GOLDEN%'"
-        query = f"SELECT id, category, concept, level, question, options, correct, explanation, theory, example, tip FROM question_bank {clause} ORDER BY RANDOM() LIMIT 1"
         
-        for _ in range(5): # On tente 5 fois pour trouver une nouvelle
-            res = run_query(query, fetch_one=True)
-            if res:
-                h = hashlib.md5(res[4].encode()).hexdigest()
-                # 1. Check permanent history (seulement si correct dans le passé)
-                already_solved = run_query('SELECT 1 FROM history WHERE user_id=? AND question_hash=?', (uid, h), fetch_one=True)
-                # 2. Check session recency (même si faux, on ne veut pas la revoir tout de suite)
-                is_recent = h in st.session_state.recently_seen
+        # On augmente le pool de recherche pour avoir plus de choix
+        query = f"SELECT id, category, concept, level, question, options, correct, explanation, theory, example, tip FROM question_bank {clause} ORDER BY RANDOM() LIMIT 10"
+        
+        res_list = run_query(query, fetch_all=True)
+        if not res_list: return None
+
+        # On cherche une question qui n'est :
+        # 1. Ni dans l'historique permanent (réussies)
+        # 2. Ni vue récemment dans cette session (même si ratée)
+        for res in res_list:
+            h = hashlib.md5(res[4].encode()).hexdigest()
+            already_solved = run_query('SELECT 1 FROM history WHERE user_id=? AND question_hash=?', (uid, h), fetch_one=True)
+            is_recent = res[0] in st.session_state.session_seen_ids
+            
+            if not already_solved and not is_recent:
+                # Marquer comme vue dans cette session
+                st.session_state.session_seen_ids.append(res[0])
+                if len(st.session_state.session_seen_ids) > 40: # On garde les 40 dernières
+                    st.session_state.session_seen_ids.pop(0)
                 
-                if not already_solved and not is_recent:
-                    # Ajouter à la liste de récence (max 20)
-                    st.session_state.recently_seen.append(h)
-                    if len(st.session_state.recently_seen) > 20:
-                        st.session_state.recently_seen.pop(0)
-                    return {"id":res[0],"category":res[1],"concept_key":res[2],"question":res[4],"options":json.loads(res[5]),"correct":res[6],"explanation":res[7],"theory":res[8],"example":res[9],"tip":res[10]}
+                return {"id":res[0],"category":res[1],"concept_key":res[2],"question":res[4],"options":json.loads(res[5]),"correct":res[6],"explanation":res[7],"theory":res[8],"example":res[9],"tip":res[10]}
         
-        # Fallback: si on ne trouve rien de nouveau après 5 essais, on accepte une question récente mais non résolue
-        res = run_query(query, fetch_one=True)
-        if res:
-             return {"id":res[0],"category":res[1],"concept_key":res[2],"question":res[4],"options":json.loads(res[5]),"correct":res[6],"explanation":res[7],"theory":res[8],"example":res[9],"tip":res[10]}
-        return None
+        # Si on n'a vraiment rien trouvé de "neuf", on prend la moins récente du lot de 10
+        res = res_list[0]
+        return {"id":res[0],"category":res[1],"concept_key":res[2],"question":res[4],"options":json.loads(res[5]),"correct":res[6],"explanation":res[7],"theory":res[8],"example":res[9],"tip":res[10]}
 
     def prefetch_next_question(self):
         if st.session_state.get('prefetched_data') is None:

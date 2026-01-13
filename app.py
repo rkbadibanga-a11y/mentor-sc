@@ -18,6 +18,7 @@ from ui.views.notes import render_notes
 from ui.views.profile import render_profile
 from ui.views.glossary import render_glossary
 from ui.views.tools import render_tools
+from ui.views.admin import render_admin_dashboard
 from utils.assets import trigger_queued_sounds
 from services.certificate_factory import show_diploma_celebration
 import time 
@@ -158,6 +159,12 @@ def main():
             "leaderboard": "🏆 Classement"
         }
         
+        # Ajout onglet Admin si autorisé
+        from core.config import ADMIN_EMAILS
+        user_email = st.session_state.get('user_email')
+        if user_email in ADMIN_EMAILS:
+            menu["admin"] = "👮 Admin"
+        
         if "active_tab" not in st.session_state:
             st.session_state.active_tab = "mission"
 
@@ -188,6 +195,7 @@ def main():
         elif tab == "notes": render_notes(uid)
         elif tab == "profile": render_profile(uid)
         elif tab == "glossary": render_glossary(uid)
+        elif tab == "admin": render_admin_dashboard()
 
         # Le footer est géré ici globalement mais ne s'affiche que s'il y a un message
         render_mentor_footer()

@@ -92,13 +92,14 @@ INFOS TECHNIQUES :
 - Onglet actif : {st.session_state.get('active_tab', 'unknown')}
 """
                 success, status_msg = send_email_notification(subject, body)
-                if success:
-                    # On enregistre aussi techniquement
+                if send_email_notification(subject, body):
+                    # On enregistre aussi techniquement en DB
+                    run_query('INSERT INTO user_feedback (user_id, user_name, user_email, message, context) VALUES (?, ?, ?, ?, ?)', 
+                             (st.session_state.user_id, st.session_state.user, user_email_input, user_message, "Sidebar Dialog"), commit=True)
+                    
                     from utils.maintenance import record_anomaly
                     record_anomaly(f"Signalement Direct (Email: {user_email_input}): {user_message}", context="Sidebar Dialog")
                     st.success("✅ Message envoyé directement à Romain !")
-                    time.sleep(2)
-                    st.rerun()
                 else:
                     st.error(f"❌ Échec de l'envoi : {status_msg}")
         elif not user_email_input:

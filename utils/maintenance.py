@@ -34,6 +34,12 @@ def record_anomaly(error, context="Crash Global"):
     try:
         with open(REPORT_FILE, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=4, ensure_ascii=False)
+        
+        # Enregistrement en base de données pour le Dashboard Admin
+        from core.database import run_query
+        run_query('INSERT INTO user_feedback (user_id, user_name, user_email, message, context) VALUES (?, ?, ?, ?, ?)', 
+                 (st.session_state.get('user_id'), st.session_state.get('user'), st.session_state.get('user_email'), str(error), context), commit=True)
+        
         return True
     except:
         return False

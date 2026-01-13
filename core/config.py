@@ -7,7 +7,7 @@ ROOT_DIR = Path(__file__).parent.parent
 APP_TITLE = "Mentor SC"
 APP_ICON = "📦"
 DB_FILE = str(ROOT_DIR / 'mentor_sc_v8.db')
-ADMIN_EMAILS = ["admin@mentor-sc.com", "test@test.com"]
+ADMIN_EMAILS = ["admin@mentor-sc.com", "test@test.com", "r.k.badibanga@gmail.com", "mentor.sc.app@gmail.com"]
 LEVEL_THRESHOLDS = {1: 0, 2: 120, 3: 250, 4: 380, 5: 500}
 
 # --- DESIGN SYSTEM ---

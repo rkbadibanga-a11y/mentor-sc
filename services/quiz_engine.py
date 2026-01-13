@@ -81,15 +81,17 @@ class QuizEngine:
         return self._fetch_specific(level_filter, None, uid, False)
 
     def _fetch_specific(self, lvl, pos, uid, fresh):
-        # Nettoyage des vieux échecs (plus de 24h)
-        run_query("DELETE FROM recent_failures WHERE timestamp < datetime('now', '-1 day')", commit=True)
-        
         clause = f"WHERE level={lvl}"
         if pos: clause += f" AND triad_position={pos}"
         if fresh: clause += " AND triad_id NOT LIKE 'GOLDEN%'"
         
-        # Tirage de 15 questions pour avoir du choix
-        query = f"SELECT id, category, concept, level, question, options, correct, explanation, theory, example, tip FROM question_bank {clause} ORDER BY RANDOM() LIMIT 15"
+        # On tire un lot de questions potentielles en une seule requête (VITESSE)
+        query = f"""
+            SELECT id, category, concept, level, question, options, correct, explanation, theory, example, tip 
+            FROM question_bank 
+            {clause} 
+            ORDER BY RANDOM() LIMIT 20
+        """
         res_list = run_query(query, fetch_all=True)
         if not res_list: return None
 
@@ -97,11 +99,11 @@ class QuizEngine:
             q_id = res[0]
             h = hashlib.md5(res[4].encode()).hexdigest()
             
-            # 1. Historique permanent (réussies)
+            # Vérification historique permanent (réussies)
             if run_query('SELECT 1 FROM history WHERE user_id=? AND question_hash=?', (uid, h), fetch_one=True):
                 continue
                 
-            # 2. Échecs récents (persistants en DB pour 24h)
+            # Vérification échecs récents
             if run_query('SELECT 1 FROM recent_failures WHERE user_id=? AND question_id=?', (uid, q_id), fetch_one=True):
                 continue
             

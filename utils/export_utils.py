@@ -67,11 +67,11 @@ def create_pdf_export(title, data_dict, summary_metrics=None):
     width, height = A4
 
     # --- Background Decoration ---
-    c.setFillColor(colors.hexColor("#0D1117")) # Same as app bg
+    c.setFillColor(colors.HexColor("#0D1117")) # Same as app bg
     c.rect(0, height - 4*cm, width, 4*cm, fill=1, stroke=0)
 
     # --- Header Branding ---
-    c.setFillColor(colors.hexColor("#00DFD8"))
+    c.setFillColor(colors.HexColor("#00DFD8"))
     c.setFont("Helvetica-Bold", 22)
     c.drawString(1.5*cm, height - 1.8*cm, "MENTOR SC")
     
@@ -86,7 +86,7 @@ def create_pdf_export(title, data_dict, summary_metrics=None):
     c.line(1.5*cm, height - 3.3*cm, width - 1.5*cm, height - 3.3*cm)
 
     # --- Report Title ---
-    c.setFillColor(colors.hexColor("#1E293B"))
+    c.setFillColor(colors.HexColor("#1E293B"))
     c.setFont("Helvetica-Bold", 20)
     c.drawCentredString(width/2, height - 5.5*cm, title)
 
@@ -94,11 +94,11 @@ def create_pdf_export(title, data_dict, summary_metrics=None):
     y = height - 7.5*cm
     if summary_metrics:
         # Gray background box for summary
-        c.setFillColor(colors.hexColor("#F1F5F9"))
+        c.setFillColor(colors.HexColor("#F1F5F9"))
         box_height = (len(summary_metrics) * 0.8 + 1) * cm
         c.roundRect(1.5*cm, y - box_height + 0.5*cm, width - 3*cm, box_height, 10, fill=1, stroke=0)
         
-        c.setFillColor(colors.hexColor("#1E293B"))
+        c.setFillColor(colors.HexColor("#1E293B"))
         c.setFont("Helvetica-Bold", 13)
         c.drawString(2*cm, y, "INDICATEURS CALCULÉS :")
         y -= 1*cm
@@ -107,14 +107,14 @@ def create_pdf_export(title, data_dict, summary_metrics=None):
             c.setFont("Helvetica", 11)
             c.drawString(2.5*cm, y, f"{label} :")
             c.setFont("Helvetica-Bold", 12)
-            c.setFillColor(colors.hexColor("#007BFF"))
+            c.setFillColor(colors.HexColor("#007BFF"))
             c.drawRightString(width - 2.5*cm, y, str(val))
-            c.setFillColor(colors.hexColor("#1E293B"))
+            c.setFillColor(colors.HexColor("#1E293B"))
             y -= 0.8*cm
         y -= 1.5*cm
 
     # --- Table Header ---
-    c.setFillColor(colors.hexColor("#1E293B"))
+    c.setFillColor(colors.HexColor("#1E293B"))
     c.rect(1.5*cm, y, width - 3*cm, 1*cm, fill=1, stroke=0)
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 11)
@@ -133,7 +133,7 @@ def create_pdf_export(title, data_dict, summary_metrics=None):
             y = height - 3*cm
         
         if alt:
-            c.setFillColor(colors.hexColor("#F8FAFC"))
+            c.setFillColor(colors.HexColor("#F8FAFC"))
             c.rect(1.5*cm, y - 0.2*cm, width - 3*cm, 0.8*cm, fill=1, stroke=0)
         
         c.setFillColor(colors.black)

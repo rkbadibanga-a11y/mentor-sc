@@ -4,209 +4,187 @@ import pandas as pd
 import numpy as np
 from scipy.stats import norm
 import io
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from utils.export_utils import create_excel_export, create_pdf_export
 
 def render_tools():
     st.markdown("### 🛠️ Boîte à Outils Supply Chain")
-    st.markdown("Passez de la théorie à l'application métier. Calculez, simulez et exportez.")
+    st.markdown("Passez de la théorie à l'application métier. Calculez, simulez et exportez vos résultats.")
 
     tabs = st.tabs([
         "🛡️ Stock de Sécurité", 
         "💰 Coût Complet (Landed Cost)", 
+        "📉 Optimiseur Wilson (EOQ)",
+        "🌍 Empreinte Carbone",
+        "💸 Cash-to-Cash",
+        "🏢 Centralisation",
         "📦 Poids Volumétrique",
-        "🚢 Sélecteur Incoterms",
-        "📊 ABC-XYZ & Formules"
+        "🚢 Sélecteur Incoterms"
     ])
 
-    with tabs[0]:
-        render_safety_stock_calculator()
+    with tabs[0]: render_safety_stock_calculator()
+    with tabs[1]: render_landed_cost_calculator()
+    with tabs[2]: render_wilson_calculator()
+    with tabs[3]: render_carbon_calculator()
+    with tabs[4]: render_cash_to_cash_calculator()
+    with tabs[5]: render_centralization_calculator()
+    with tabs[6]: render_volumetric_calculator()
+    with tabs[7]: render_incoterm_selector()
 
-    with tabs[1]:
-        render_landed_cost_calculator()
-
-    with tabs[2]:
-        render_volumetric_calculator()
+def render_export_buttons(title, data, summary):
+    st.markdown("---")
+    c1, c2 = st.columns(2)
     
-    with tabs[3]:
-        render_incoterm_selector()
-
-    with tabs[4]:
-        render_templates_section()
+    excel_data = create_excel_export(title, data, summary)
+    c1.download_button(
+        label=f"📥 Télécharger Excel (.xlsx)",
+        data=excel_data,
+        file_name=f"MentorSC_{title.replace(' ', '_')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
+    
+    pdf_data = create_pdf_export(title, data, summary)
+    c2.download_button(
+        label=f"📄 Télécharger Rapport PDF (.pdf)",
+        data=pdf_data,
+        file_name=f"MentorSC_{title.replace(' ', '_')}.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
 
 # --- 1. STOCK DE SÉCURITÉ ---
 def render_safety_stock_calculator():
-    st.subheader("🛡️ Calculateur de Stock de Sécurité (Modèle de King)")
-    st.info("Ce modèle combine l'incertitude de la demande ET la fiabilité du délai fournisseur.")
-
+    st.subheader("🛡️ Calculateur de Stock de Sécurité")
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("**📁 Demande**")
-        avg_demand = st.number_input("Conso moyenne / jour", value=100.0, step=1.0, key="ss_avg_d")
-        std_demand = st.number_input("Écart-type conso", value=20.0, step=1.0, key="ss_std_d")
-        
-        st.markdown("**🚚 Fournisseur**")
-        lead_time = st.number_input("Délai moyen (jours)", value=10.0, step=1.0, key="ss_lt")
-        std_lead_time = st.number_input("Écart-type délai (jours)", value=2.0, step=0.5, key="ss_std_lt")
-
+        avg_d = st.number_input("Conso moyenne / jour", value=100.0, key="ss_avg")
+        std_d = st.number_input("Écart-type conso", value=20.0, key="ss_std")
     with col2:
-        st.markdown("**🎯 Service**")
-        service_level = st.slider("Taux de Service cible (%)", 80.0, 99.9, 95.0, 0.1, key="ss_sl")
-        z_score = norm.ppf(service_level / 100)
-        st.metric("Coefficient Z", f"{z_score:.2f}")
+        lt = st.number_input("Délai moyen (jours)", value=10.0, key="ss_lt")
+        std_lt = st.number_input("Écart-type délai (jours)", value=2.0, key="ss_std_lt")
+    
+    sl = st.slider("Taux de Service cible (%)", 80.0, 99.9, 95.0, 0.1)
+    z = norm.ppf(sl / 100)
+    ss = z * np.sqrt(lt * (std_d ** 2) + (avg_d ** 2) * (std_lt ** 2))
+    
+    st.metric("Stock de Sécurité", f"{int(np.ceil(ss))} unités")
+    
+    data = {"Conso Moyenne": avg_d, "Ecart-type Conso": std_d, "Délai Moyen": lt, "Ecart-type Délai": std_lt, "Taux de Service": sl, "Coeff Z": f"{z:.2f}"}
+    summary = {"Stock de Sécurité": f"{int(np.ceil(ss))} unités", "Point de Commande": f"{int(np.ceil(avg_d*lt + ss))} unités"}
+    render_export_buttons("Stock de Sécurité", data, summary)
 
-    combined_std = np.sqrt(lead_time * (std_demand ** 2) + (avg_demand ** 2) * (std_lead_time ** 2))
-    safety_stock = z_score * combined_std
-
-    st.markdown("---")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Stock de Sécurité", f"{int(np.ceil(safety_stock))} u.")
-    c2.metric("Point de Commande", f"{int(np.ceil(avg_demand * lead_time + safety_stock))} u.")
-    c3.metric("Stock Moyen (SS)", f"{int(np.ceil(safety_stock))} u.")
-
-    if st.button("📥 Générer Excel Stock de Sécurité", use_container_width=True):
-        output = create_ss_excel(avg_demand, std_demand, lead_time, std_lead_time, service_level, safety_stock, z_score)
-        st.download_button("💾 Télécharger SS.xlsx", output, "MentorSC_Stock_Securite.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-# --- 2. LANDED COST (COÛT COMPLET) ---
+# --- 2. LANDED COST ---
 def render_landed_cost_calculator():
-    st.subheader("💰 Comparateur de Coût Complet (Landed Cost)")
-    st.write("Comparez deux sources d'approvisionnement en incluant les coûts cachés.")
-
-    col1, col2 = st.columns(2)
+    st.subheader("💰 Comparateur de Coût Complet")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("**Source A (Lointain)**")
+        p_a = st.number_input("Prix Achat A", value=10.0)
+        f_a = st.number_input("Fret A", value=2.0)
+        d_a = st.number_input("Douane A (%)", value=6.0)
+        lt_a = st.number_input("Délai A (jours)", value=40)
+    with c2:
+        st.markdown("**Source B (Proche)**")
+        p_b = st.number_input("Prix Achat B", value=13.0)
+        f_b = st.number_input("Fret B", value=0.5)
+        d_b = st.number_input("Douane B (%)", value=0.0)
+        lt_b = st.number_input("Délai B (jours)", value=5)
     
-    with col1:
-        st.markdown("### 🇨🇳 Source A (Ex: Grand Import)")
-        price_a = st.number_input("Prix unitaire (Ex-Works)", value=10.0, key="lc_p_a")
-        freight_a = st.number_input("Fret unitaire", value=2.5, key="lc_f_a")
-        customs_a = st.number_input("Droits de douane (%)", value=6.5, key="lc_c_a")
-        lead_time_a = st.number_input("Temps de transport (jours)", value=45, key="lc_lt_a")
+    rate = st.slider("Taux de possession annuel (%)", 5, 30, 15) / 100
+    
+    def calc(p, f, d, lt):
+        duty = (p+f) * (d/100)
+        fin = (p+f+duty) * rate * (lt/365)
+        return p + f + duty + fin, duty, fin
 
-    with col2:
-        st.markdown("### 🇪🇺 Source B (Ex: Proche Import)")
-        price_b = st.number_input("Prix unitaire (Ex-Works)", value=14.0, key="lc_p_b")
-        freight_b = st.number_input("Fret unitaire", value=0.8, key="lc_f_b")
-        customs_b = st.number_input("Droits de douane (%)", value=0.0, key="lc_c_b")
-        lead_time_b = st.number_input("Temps de transport (jours)", value=5, key="lc_lt_b")
+    t_a, dt_a, fn_a = calc(p_a, f_a, d_a, lt_a)
+    t_b, dt_b, fn_b = calc(p_b, f_b, d_b, lt_b)
+    
+    st.write(f"**Landed A:** {t_a:.2f}€ | **Landed B:** {t_b:.2f}€")
+    data = {"Prix A": p_a, "Fret A": f_a, "Douane A": f"{d_a}%", "Délai A": lt_a, "Prix B": p_b, "Fret B": f_b, "Douane B": f"{d_b}%", "Délai B": lt_b, "Taux Possession": f"{rate*100}%"}
+    summary = {"Coût Total A": f"{t_a:.2f}€", "Coût Total B": f"{t_b:.2f}€", "Ecart Unitaire": f"{abs(t_a-t_b):.2f}€"}
+    render_export_buttons("Coût Complet", data, summary)
 
-    st.markdown("---")
-    cost_capital = st.slider("Taux de possession annuel (%)", 5.0, 30.0, 15.0, 1.0) / 100
+# --- 3. WILSON (EOQ) ---
+def render_wilson_calculator():
+    st.subheader("📉 Optimiseur de Commande (Wilson)")
+    d = st.number_input("Demande Annuelle (unités)", value=12000)
+    s = st.number_input("Coût fixe d'une commande (S)", value=50.0)
+    h = st.number_input("Coût de possession annuel par unité (H)", value=2.0)
+    
+    eoq = np.sqrt((2 * d * s) / h)
+    n = d / eoq
+    
+    st.metric("Quantité Économique (EOQ)", f"{int(np.ceil(eoq))} unités")
+    st.write(f"Fréquence idéale : {n:.1f} commandes / an (soit tous les {365/n:.0f} jours)")
+    
+    data = {"Demande Annuelle": d, "Coût Commande (S)": s, "Coût Stockage (H)": h}
+    summary = {"EOQ": f"{int(np.ceil(eoq))} unités", "Commandes/An": f"{n:.1f}"}
+    render_export_buttons("Optimiseur Wilson", data, summary)
 
-    # Calculs
-    def calc_landed(p, f, c, lt):
-        duties = (p + f) * (c / 100)
-        # Coût financier du stock en transit
-        financial_cost = (p + f + duties) * cost_capital * (lt / 365)
-        total = p + f + duties + financial_cost
-        return total, duties, financial_cost
+# --- 4. CARBONE ---
+def render_carbon_calculator():
+    st.subheader("🌍 Calculateur d'Empreinte Carbone")
+    weight = st.number_input("Poids total (tonnes)", value=1.0)
+    dist = st.number_input("Distance (km)", value=1000)
+    
+    factors = {"Avion": 0.500, "Camion": 0.080, "Train": 0.020, "Maritime": 0.010}
+    res = {m: weight * dist * f for m, f in factors.items()}
+    
+    st.write(pd.DataFrame(list(res.items()), columns=["Mode", "CO2 (kg)"]))
+    render_export_buttons("Empreinte Carbone", {"Poids (T)": weight, "Distance (km)": dist}, {m: f"{v:.1f} kg CO2" for m, v in res.items()})
 
-    total_a, duty_a, fin_a = calc_landed(price_a, freight_a, customs_a, lead_time_a)
-    total_b, duty_b, fin_b = calc_landed(price_b, freight_b, customs_b, lead_time_b)
+# --- 5. CASH TO CASH ---
+def render_cash_to_cash_calculator():
+    st.subheader("💸 Simulateur Cash-to-Cash")
+    dso = st.number_input("Délai paiement Client (DSO - jours)", value=45)
+    dio = st.number_input("Délai de Stockage (DIO - jours)", value=60)
+    dpo = st.number_input("Délai paiement Fournisseur (DPO - jours)", value=30)
+    
+    c2c = dso + dio - dpo
+    st.metric("Cycle Cash-to-Cash", f"{c2c} jours")
+    
+    data = {"DSO (Clients)": dso, "DIO (Stocks)": dio, "DPO (Fournisseurs)": dpo}
+    summary = {"Cycle C2C": f"{c2c} jours"}
+    render_export_buttons("Cash-to-Cash", data, summary)
 
-    res1, res2 = st.columns(2)
-    res1.metric("Total Landed A", f"{total_a:.2f} €", f"{((total_a/total_b)-1)*100:+.1f}% vs B")
-    res2.metric("Total Landed B", f"{total_b:.2f} €", f"{((total_b/total_a)-1)*100:+.1f}% vs A")
+# --- 6. CENTRALISATION ---
+def render_centralization_calculator():
+    st.subheader("🏢 Simulateur de Centralisation (Square Root Law)")
+    stock = st.number_input("Stock de sécurité actuel global", value=10000)
+    n_old = st.number_input("Nombre d'entrepôts actuels", value=5)
+    n_new = st.number_input("Nombre d'entrepôts futurs", value=1)
+    
+    new_stock = stock * np.sqrt(n_new / n_old)
+    saving = stock - new_stock
+    
+    st.metric("Nouveau Stock estimé", f"{int(new_stock)}", f"-{int(saving)} unités")
+    st.write(f"Économie de stock de sécurité estimée : **{int((saving/stock)*100)}%**")
+    
+    data = {"Stock Initial": stock, "Nb Entrepôts Avant": n_old, "Nb Entrepôts Après": n_new}
+    summary = {"Stock Futur": int(new_stock), "Economie": f"{int(saving)} unités"}
+    render_export_buttons("Centralisation", data, summary)
 
-    with st.expander("📊 Détail des coûts unitaires"):
-        st.write(pd.DataFrame({
-            "Poste de coût": ["Prix Achat", "Fret", "Douane", "Portage Financier", "TOTAL"],
-            "Source A": [f"{price_a}€", f"{freight_a}€", f"{duty_a:.2f}€", f"{fin_a:.2f}€", f"{total_a:.2f}€"],
-            "Source B": [f"{price_b}€", f"{freight_b}€", f"{duty_b:.2f}€", f"{fin_b:.2f}€", f"{total_b:.2f}€"]
-        }))
-
-# --- 3. POIDS VOLUMÉTRIQUE ---
+# --- 7. VOLUMÉTRIQUE ---
 def render_volumetric_calculator():
-    st.subheader("📦 Calculateur de Poids Volumétrique")
-    st.write("Le transporteur facture au plus élevé entre le poids réel et le volume.")
-
-    c1, c2, c3 = st.columns(3)
-    length = c1.number_input("Longueur (cm)", 1.0, 300.0, 60.0)
-    width = c2.number_input("Largeur (cm)", 1.0, 300.0, 40.0)
-    height = c3.number_input("Hauteur (cm)", 1.0, 300.0, 40.0)
+    st.subheader("📦 Poids Volumétrique")
+    l = st.number_input("L (cm)", value=60); w = st.number_input("W (cm)", value=40); h = st.number_input("H (cm)", value=40)
+    real = st.number_input("Poids réel (kg)", value=10.0)
+    ratio = st.selectbox("Ratio", [6000, 5000, 3000], format_func=lambda x: f"1:{x//1000} ({x})")
     
-    real_weight = st.number_input("Poids Réel (kg)", 0.1, 1000.0, 15.0)
-    mode = st.radio("Mode de transport", ["Aérien (1:6)", "Route (1:3)", "Maritime (1:1)"], horizontal=True)
+    vol = (l*w*h)/ratio
+    taxable = max(real, vol)
+    st.metric("Poids Taxable", f"{taxable:.2f} kg", f"Vol: {vol:.2f} kg")
+    render_export_buttons("Poids Volumetrique", {"L":l, "W":w, "H":h, "Réel":real, "Ratio":ratio}, {"Poids Taxable": f"{taxable:.2f} kg"})
 
-    ratios = {"Aérien (1:6)": 6000, "Route (1:3)": 3000, "Maritime (1:1)": 1000}
-    ratio = ratios[mode]
-    
-    vol_weight = (length * width * height) / (ratio if mode != "Maritime (1:1)" else 1000)
-    if mode == "Maritime (1:1)": vol_weight = (length * width * height) / 1000000 * 1000 # 1m3 = 1000kg
-
-    st.markdown("---")
-    res_c1, res_c2 = st.columns(2)
-    res_c1.metric("Poids Volumétrique", f"{vol_weight:.2f} kg")
-    
-    is_vol = vol_weight > real_weight
-    taxable = max(vol_weight, real_weight)
-    
-    color = "red" if is_vol else "green"
-    st.markdown(f"""
-    <div style="padding:20px; border-radius:10px; border:2px solid {color}; text-align:center;">
-        <h3 style="color:{color};">Poids Taxable : {taxable:.2f} kg</h3>
-        <p>{"⚠️ Attention : Vous payez pour du volume (votre colis est 'léger')." if is_vol else "✅ Optimal : Vous payez pour le poids réel."}</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-# --- 4. INCOTERMS ---
+# --- 8. INCOTERMS ---
 def render_incoterm_selector():
-    st.subheader("🚢 Sélecteur d'Incoterm Idéal")
-    st.write("Répondez à 3 questions pour trouver l'Incoterm adapté à votre stratégie.")
+    st.subheader("🚢 Sélecteur Incoterms")
+    q1 = st.toggle("Maîtrise du transport international")
+    q2 = st.toggle("Douane import gérée par le vendeur")
+    res = "DDP" if q2 else ("FOB/FCA" if q1 else "EXW")
+    st.success(f"Incoterm recommandé : **{res}**")
+    render_export_buttons("Incoterms", {"Maitrise Transport": q1, "Douane Import Vendeur": q2}, {"Recommandation": res})
 
-    q1 = st.toggle("Je veux maîtriser le coût et le choix du transporteur international")
-    q2 = st.toggle("Je veux que le fournisseur gère toutes les formalités de douane import")
-    q3 = st.toggle("Je veux limiter mes risques au maximum (livraison chez moi)")
-
-    st.markdown("---")
-    if q3 or q2:
-        st.success("🎯 Recommandation : **DDP (Delivered Duty Paid)**")
-        st.write("Le fournisseur s'occupe de tout jusqu'à votre porte. Confort maximal, mais coût caché probable.")
-    elif q1:
-        st.success("🎯 Recommandation : **FOB (Free On Board)** ou **FCA**")
-        st.write("Vous maîtrisez la chaîne logistique dès le départ du pays d'origine. Idéal pour optimiser les coûts.")
-    else:
-        st.info("🎯 Recommandation : **EXW (Ex-Works)**")
-        st.write("Le fournisseur met juste à disposition. Attention : vous gérez la douane export dans un pays étranger !")
-
-# --- 5. ABC-XYZ & TEMPLATES ---
 def render_templates_section():
-    st.subheader("📊 Segmentation & Formules")
-    
-    with st.expander("📐 Aide à la décision ABC-XYZ"):
-        st.write("""
-        | Catégorie | XYZ (Prévisibilité) | Stratégie Recommandée |
-        | :--- | :--- | :--- |
-        | **AX** | Stable | Automatisation, Flux tendu, Stock bas. |
-        | **AZ** | Imprévisible | **Risque Obsolescence**. Make-to-order ou Centralisation. |
-        | **CX** | Stable | Stockage de masse (C'est pas cher). |
-        | **CZ** | Imprévisible | Stock de sécurité élevé pour éviter les irritants. |
-        """)
-
-    st.markdown("#### 📋 Bibliothèque de Formules")
-    formulas = [
-        {"name": "Wilson (EOQ)", "code": "=SQRT((2*Demande*Cout_Commande)/Cout_Stockage)", "desc": "Quantité optimale de commande."},
-        {"name": "Taux de Rotation", "code": "=Ventes_Annuelles / Stock_Moyen", "desc": "Nombre de fois où le stock est renouvelé."},
-        {"name": "Délai de Couverture", "code": "= (Stock_Actuel / Conso_Moyenne_Jour)", "desc": "Autonomie du stock en jours."}
-    ]
-    for f in formulas:
-        st.text(f["name"])
-        st.code(f["code"], language="excel")
-        st.caption(f["desc"])
-
-# --- HELPERS EXCEL ---
-def create_ss_excel(avg_c, std_c, lt, std_lt, sl, ss, z):
-    output = io.BytesIO()
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Calculateur SS"
-    # (Style simplifiés pour la rapidité)
-    ws['B2'] = "OUTIL STOCK DE SÉCURITÉ"
-    ws['B4'], ws['C4'] = "Paramètre", "Valeur"
-    ws.append(["", "Conso Moy", avg_c])
-    ws.append(["", "Ecart-type Conso", std_c])
-    ws.append(["", "Delai Moy", lt])
-    ws.append(["", "Ecart-type Delai", std_lt])
-    ws.append(["", "Z Score", z])
-    ws.append(["", "STOCK SÉCURITÉ", ss])
-    wb.save(output)
-    return output.getvalue()
+    st.write("Section ABC-XYZ déplacée vers les fiches outils.")

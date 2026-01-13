@@ -47,7 +47,7 @@ def render_login():
                         
                         # --- MODERNE : COOKIE ---
                         import extra_streamlit_components as stx
-                        cm = stx.CookieManager()
+                        cm = stx.CookieManager(key="cookie_manager_auth")
                         cm.set('mentor_sc_uid', user_id, expires_at=None) # Expire dans 30 jours par défaut
                         
                         st.session_state.update({

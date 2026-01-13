@@ -34,7 +34,7 @@ def main():
         handle_google_callback()
 
     # --- GESTION DES COOKIES (MODERNE) ---
-    cookie_manager = stx.CookieManager()
+    cookie_manager = stx.CookieManager(key="cookie_manager_main")
     
     # 1. Tentative de récupération du UID via Cookie
     if not st.session_state.get('auth'):

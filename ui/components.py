@@ -68,18 +68,36 @@ def report_anomaly_dialog():
         else:
             st.warning("Veuillez décrire l'anomalie.")
 
-    # Create mailto link
-    subject = f"Signalement d'anomalie - {st.session_state.user}"
-    body = f"Bonjour Romain,\n\nJe signale une anomalie sur Mentor SC :\n\n{user_message}\n\n---\nUtilisateur : {st.session_state.user}\nNiveau : {st.session_state.level}\nXP : {st.session_state.xp}"
-    mailto_link = f"mailto:r.k.badibanga@gmail.com?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
-    
-    col2.markdown(f'''
-        <a href="{mailto_link}" style="text-decoration: none;">
-            <div style="background-color: #ff4b4b; color: white; padding: 8px; border-radius: 5px; text-align: center; font-weight: bold; border: 1px solid #ff4b4b;">
-                📧 Envoyer Email
-            </div>
-        </a>
-    ''', unsafe_allow_html=True)
+    if col2.button("📧 Envoyer Directement", type="primary", use_container_width=True):
+        if user_message:
+            with st.spinner("Envoi en cours..."):
+                from services.email_service import send_email_notification
+                subject = f"🚨 Signalement Mentor SC - {st.session_state.user}"
+                body = f"""Bonjour Romain,
+
+Un utilisateur a signalé une anomalie.
+
+MESSAGE :
+{user_message}
+
+INFOS UTILISATEUR :
+- Pseudo : {st.session_state.user}
+- Email : {st.session_state.get('user_email', 'N/A')}
+- Niveau : {st.session_state.level}
+- XP : {st.session_state.xp}
+- Onglet actif : {st.session_state.get('active_tab', 'unknown')}
+"""
+                if send_email_notification(subject, body):
+                    # On enregistre aussi techniquement
+                    from utils.maintenance import record_anomaly
+                    record_anomaly(f"Signalement Direct: {user_message}", context="Sidebar Dialog")
+                    st.success("✅ Message envoyé directement à Romain !")
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.error("❌ Erreur lors de l'envoi. Vérifie ta configuration.")
+        else:
+            st.warning("Veuillez décrire l'anomalie.")
 
 def render_sidebar():
     lang = st.session_state.get('lang', 'Français')

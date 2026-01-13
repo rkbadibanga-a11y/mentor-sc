@@ -5,13 +5,18 @@ from core.database import run_query
 
 def render_leaderboard():
     st.markdown("### 🏆 Classement Mondial des Experts")
-    st.markdown("Découvrez qui sont les leaders de la Supply Chain Performance.")
     
-    # Récupération de tous les utilisateurs (Top 100)
+    # Explication de la règle de gestion (Transparence)
+    st.info("""
+    **⚖️ Règle du Classement :** L'expertise (le **Niveau**) est la priorité absolue. 
+    À niveau égal, les experts sont départagés par leur **Score Prestige** (XP cumulée).
+    """)
+    
+    # Récupération de tous les utilisateurs (Top 100) triés par Niveau puis Score
     users = run_query('''
-        SELECT name, total_score, level, city, last_seen 
+        SELECT name, level, total_score, city, last_seen 
         FROM users 
-        ORDER BY total_score DESC 
+        ORDER BY level DESC, total_score DESC 
         LIMIT 100
     ''', fetch_all=True)
     
@@ -20,7 +25,7 @@ def render_leaderboard():
         return
 
     # Transformation en DataFrame pour un bel affichage
-    df = pd.DataFrame(users, columns=["Expert", "Score Prestige", "Niveau", "Ville", "Dernière Activité"])
+    df = pd.DataFrame(users, columns=["Expert", "Niveau", "Score Prestige", "Ville", "Dernière Activité"])
     
     # Ajout du rang
     df.index = range(1, len(df) + 1)
@@ -36,4 +41,4 @@ def render_leaderboard():
     st.table(df.style.apply(color_rows, axis=1))
 
     st.markdown("---")
-    st.caption("Le score Prestige est cumulé à chaque bonne réponse (+20 pts). Les crises maîtrisées et les diplômes augmentent votre renommée.")
+    st.caption("💡 Le grade (Niveau) reflète votre avancement dans le curriculum. Le score Prestige est le cumul de vos bonnes réponses. Plus vous montez en niveau, plus votre autorité dans le classement est forte.")

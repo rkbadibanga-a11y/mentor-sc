@@ -51,25 +51,26 @@ def render_mentor_footer():
 @st.dialog("Signaler une anomalie")
 def report_anomaly_dialog():
     st.markdown("##### 🛠️ Rapport d'incident")
-    st.write("Dites-nous ce qui ne va pas. Votre message sera enregistré techniquement et vous pourrez également nous l'envoyer par email.")
+    st.write("Dites-nous ce qui ne va pas. Votre message sera envoyé directement à Romain.")
     
-    user_message = st.text_area("Précisions sur l'anomalie :", placeholder="Décrivez le problème ici (ex: erreur de calcul, bug d'affichage...)", height=150)
+    # Nouveau champ Email
+    user_email_input = st.text_input("Votre adresse email (pour vous répondre) :", value=st.session_state.get('user_email', ''))
+    
+    user_message = st.text_area("Précisions sur l'anomalie :", placeholder="Décrivez le problème ici...", height=150)
     
     st.markdown("---")
     col1, col2 = st.columns(2)
     
-    if col1.button("💾 Enregistrer", use_container_width=True):
+    if col1.button("💾 Enregistrer localement", use_container_width=True):
         if user_message:
             from utils.maintenance import record_anomaly
-            record_anomaly(f"Signalement Manuel: {user_message}", context="Interface Sidebar Dialog")
+            record_anomaly(f"Signalement Manuel (Email: {user_email_input}): {user_message}", context="Interface Sidebar Dialog")
             st.toast("✅ Rapport enregistré !")
-            time.sleep(1)
-            st.rerun()
         else:
             st.warning("Veuillez décrire l'anomalie.")
 
     if col2.button("📧 Envoyer Directement", type="primary", use_container_width=True):
-        if user_message:
+        if user_message and user_email_input:
             with st.spinner("Envoi en cours..."):
                 from services.email_service import send_email_notification
                 subject = f"🚨 Signalement Mentor SC - {st.session_state.user}"
@@ -77,12 +78,15 @@ def report_anomaly_dialog():
 
 Un utilisateur a signalé une anomalie.
 
+CONTACT :
+- Pseudo : {st.session_state.user}
+- Email saisi : {user_email_input}
+- Email profil : {st.session_state.get('user_email', 'N/A')}
+
 MESSAGE :
 {user_message}
 
-INFOS UTILISATEUR :
-- Pseudo : {st.session_state.user}
-- Email : {st.session_state.get('user_email', 'N/A')}
+INFOS TECHNIQUES :
 - Niveau : {st.session_state.level}
 - XP : {st.session_state.xp}
 - Onglet actif : {st.session_state.get('active_tab', 'unknown')}
@@ -90,12 +94,14 @@ INFOS UTILISATEUR :
                 if send_email_notification(subject, body):
                     # On enregistre aussi techniquement
                     from utils.maintenance import record_anomaly
-                    record_anomaly(f"Signalement Direct: {user_message}", context="Sidebar Dialog")
+                    record_anomaly(f"Signalement Direct (Email: {user_email_input}): {user_message}", context="Sidebar Dialog")
                     st.success("✅ Message envoyé directement à Romain !")
                     time.sleep(2)
                     st.rerun()
                 else:
-                    st.error("❌ Erreur lors de l'envoi. Vérifie ta configuration.")
+                    st.error("❌ Erreur lors de l'envoi. Vérifiez la configuration SMTP.")
+        elif not user_email_input:
+            st.warning("Veuillez renseigner votre email pour qu'on puisse vous répondre.")
         else:
             st.warning("Veuillez décrire l'anomalie.")
 

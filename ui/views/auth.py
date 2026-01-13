@@ -24,6 +24,13 @@ def render_login():
                     res = run_query('SELECT * FROM users WHERE email=?', (email,), fetch_one=True)
                     if res:
                         user_id = res[0]
+                        # Restaurer les données depuis le Cloud pour être sûr d'avoir l'historique
+                        from core.database import pull_user_data_from_supabase
+                        pull_user_data_from_supabase(user_id)
+                        
+                        # Re-fetch local après le pull
+                        res = run_query('SELECT * FROM users WHERE user_id=?', (user_id,), fetch_one=True)
+                        
                         st.query_params["uid"] = user_id # Sauvegarder dans l'URL
                         st.session_state.update({
                             'auth':True, 'user_id':user_id, 'user':res[1], 'user_email': email, 'user_city': res[10],

@@ -49,7 +49,15 @@ def main():
     # --- PERSISTANCE DE SESSION (Auto-Login via URL) ---
     if not st.session_state.get('auth') and 'uid' in st.query_params:
         uid = st.query_params['uid']
+        # Tenter de récupérer localement
         res = run_query('SELECT * FROM users WHERE user_id=?', (uid,), fetch_one=True)
+        
+        # Si absent localement (ex: redémarrage serveur online), tenter un Pull depuis Supabase
+        if not res:
+            from core.database import pull_user_data_from_supabase
+            if pull_user_data_from_supabase(uid):
+                res = run_query('SELECT * FROM users WHERE user_id=?', (uid,), fetch_one=True)
+
         if res:
             st.session_state.update({
                 'auth':True, 'user_id':res[0], 'user':res[1], 'user_email': res[9], 'user_city': res[10],

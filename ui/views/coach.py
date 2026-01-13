@@ -47,15 +47,16 @@ def render_coach():
         if cols_q[i%2].button(label, key=f"btn_q_{i}", use_container_width=True):
             selected_quick = prompt_text
 
-    # 3. CHAT INPUT
+    # 3. CHAT INPUT & CONFIG
+    c1, c2 = st.columns([0.7, 0.3])
+    tone = c1.radio("Ton du Mentor :", ["🎩 Stratège", "🔥 Drill Sergeant", "💡 Socratique"], horizontal=True)
+    if c2.button("🗑️ Reset Chat", use_container_width=True):
+        st.session_state.chat_history = []
+        st.rerun()
+
     with st.form("mentor_chat_form", clear_on_submit=True):
         user_input = st.text_area("Votre message ou situation...", placeholder="Ex: Voici mes données de stock...", height=100)
-        c1, c2 = st.columns([0.7, 0.3])
-        tone = c1.radio("Ton du Mentor :", ["🎩 Stratège", "🔥 Drill Sergeant", "💡 Socratique"], horizontal=True)
-        submit_btn = c2.form_submit_button("Lancer l'Audit 🚀", use_container_width=True)
-        if c2.button("🗑️ Reset Chat", use_container_width=True):
-            st.session_state.chat_history = []
-            st.rerun()
+        submit_btn = st.form_submit_button("Lancer l'Audit 🚀", use_container_width=True)
     
     final_prompt = selected_quick if selected_quick else (user_input if submit_btn else None)
 

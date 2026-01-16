@@ -6,18 +6,27 @@ from core.database import run_query
 def render_leaderboard():
     st.markdown("### 🏆 Classement Mondial des Experts")
     
+    # Synchronisation préalable avec le Cloud pour voir tout le monde
+    from core.database import sync_leaderboard_from_supabase
+    
+    show_all = st.toggle("Afficher tout le monde (au-delà du Top 100)", value=False)
+    limit = 1000 if show_all else 100
+
+    with st.spinner("Mise à jour du classement..."):
+        sync_leaderboard_from_supabase(limit=limit)
+    
     # Explication de la règle de gestion (Transparence)
     st.info("""
     **⚖️ Règle du Classement :** L'expertise (le **Niveau**) est la priorité absolue. 
     À niveau égal, les experts sont départagés par leur **Score Prestige** (XP cumulée).
     """)
     
-    # Récupération de tous les utilisateurs (Top 100) triés par Niveau puis Score
-    users = run_query('''
+    # Récupération des utilisateurs triés par Niveau puis Score
+    users = run_query(f'''
         SELECT name, level, total_score, city, last_seen 
         FROM users 
         ORDER BY level DESC, total_score DESC 
-        LIMIT 100
+        LIMIT {limit}
     ''', fetch_all=True)
     
     if not users:

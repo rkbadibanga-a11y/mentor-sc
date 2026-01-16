@@ -202,6 +202,8 @@ def render_sidebar():
 
         st.markdown("---")
         if st.button(t('logout', lang), use_container_width=True):
+            cm = st.session_state.get('cookie_manager')
+            if cm: cm.delete('mentor_sc_uid')
             st.session_state.clear()
             st.query_params.clear() # Nettoyer l'URL
             st.rerun()            
@@ -213,6 +215,8 @@ def render_sidebar():
 
 
         if st.button(t('purge', lang), type="primary", use_container_width=True):
+            cm = st.session_state.get('cookie_manager')
+            if cm: cm.delete('mentor_sc_uid')
             run_query("DELETE FROM users WHERE user_id=?", (st.session_state.user_id,), commit=True)
             st.session_state.clear()
             st.rerun()

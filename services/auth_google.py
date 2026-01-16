@@ -74,9 +74,12 @@ def handle_google_callback():
                 'active_tab': 'mission'
             })
             
-            # Cookie
-            cm = stx.CookieManager()
-            cm.set('mentor_sc_uid', user_id)
+            # Cookie persistant (30 jours)
+            from datetime import datetime, timedelta
+            expires = datetime.now() + timedelta(days=30)
+            cm = st.session_state.get('cookie_manager')
+            if cm:
+                cm.set('mentor_sc_uid', user_id, expires_at=expires)
             
             # Clean URL
             st.query_params.clear()

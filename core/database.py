@@ -255,8 +255,52 @@ def init_db():
     run_query("DELETE FROM glossary WHERE definition LIKE '%Définition%' OR definition LIKE '%Déf%' OR definition LIKE '%?%' OR term = 'Terme' OR term = 'Objet';", commit=True)
     run_query("DELETE FROM recent_failures WHERE timestamp < datetime('now', '-1 day')", commit=True)
 
+def sync_leaderboard_from_supabase(limit=100):
+    """Synchronise les meilleurs utilisateurs depuis Supabase vers la base locale."""
+    try:
+        sb = DatabaseManager.get_supabase()
+        if not sb: return
+        
+        res = sb.table("users").select("user_id, name, level, xp, total_score, mastery, q_count, hearts, email, city, crisis_wins, has_diploma, last_seen").order("level", desc=True).order("total_score", desc=True).limit(limit).execute()
+        
+        if res.data:
+            for u in res.data:
+                run_query("""
+                    INSERT OR REPLACE INTO users 
+                    (user_id, name, level, xp, total_score, mastery, q_count, hearts, email, city, crisis_wins, has_diploma, last_seen)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    u['user_id'], u['name'], u.get('level', 1), u.get('xp', 0), 
+                    u.get('total_score', 0), u.get('mastery', 0), u.get('q_count', 0), 
+                    u.get('hearts', 5), u.get('email'), u.get('city', ''), u.get('crisis_wins', 0),
+                    u.get('has_diploma', 0), u.get('last_seen')
+                ), commit=False)
+    except Exception as e:
+        print(f"Leaderboard Sync Error: {e}")
+
+def sync_all_users_for_admin():
+    """Synchronise l'intégralité des utilisateurs pour le dashboard admin."""
+    try:
+        sb = DatabaseManager.get_supabase()
+        if not sb: return
+        
+        res = sb.table("users").select("*").execute()
+        if res.data:
+            for u in res.data:
+                run_query("""
+                    INSERT OR REPLACE INTO users 
+                    (user_id, name, level, xp, total_score, mastery, q_count, hearts, email, city, crisis_wins, has_diploma, last_seen, joker_5050, joker_hint)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    u['user_id'], u['name'], u.get('level', 1), u.get('xp', 0), 
+                    u.get('total_score', 0), u.get('mastery', 0), u.get('q_count', 0), 
+                    u.get('hearts', 5), u.get('email'), u.get('city', ''), u.get('crisis_wins', 0),
+                    u.get('has_diploma', 0), u.get('last_seen'), u.get('joker_5050', 3), u.get('joker_hint', 3)
+                ), commit=False)
+    except Exception as e:
+        print(f"Admin Sync Error: {e}")
+
 def get_leaderboard():
-
-    """Récupère les meilleurs utilisateurs triés par Niveau puis par Score."""
-
+    """Récupère les meilleurs utilisateurs. Tente de synchroniser avec Supabase."""
+    sync_leaderboard_from_supabase(limit=10)
     return run_query('SELECT name, total_score, level FROM users ORDER BY level DESC, total_score DESC LIMIT 10', fetch_all=True)

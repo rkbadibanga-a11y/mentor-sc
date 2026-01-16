@@ -29,36 +29,36 @@ def main():
     apply_styles()
     init_db()
 
-    # --- GESTION CALLBACK GOOGLE ---
-    if "code" in st.query_params:
-        from services.auth_google import handle_google_callback
-        handle_google_callback()
-
     # --- GESTION DES COOKIES (MODERNE) ---
     if 'cookie_manager' not in st.session_state:
         st.session_state.cookie_manager = stx.CookieManager(key="cookie_manager_main")
     
+    # --- GESTION CALLBACK GOOGLE ---
+    if "code" in st.query_params:
+        from services.auth_google import handle_google_callback
+        handle_google_callback()
+    
     # 1. Tentative de récupération du UID via Cookie (Seulement si non auth et pas encore checké)
     if not st.session_state.get('auth') and not st.session_state.get('cookie_checked'):
-        saved_uid = st.session_state.cookie_manager.get('mentor_sc_uid')
-        if saved_uid:
-            res = run_query('SELECT * FROM users WHERE user_id=?', (saved_uid,), fetch_one=True)
-            if res:
-                st.session_state.update({
-                    'auth':True, 'user_id':res[0], 'user':res[1], 'user_email': res[9], 'user_city': res[10],
-                    'level':int(res[2] or 1), 'xp':int(res[3] or 0), 'total_score':int(res[4] or 0),
-                    'mastery':int(res[5] or 0), 'q_count':int(res[6] or 0), 'hearts':int(res[7] or 3),
-                    'active_tab': 'mission',
-                    'cookie_checked': True
-                })
-                st.rerun()
-        else:
-            # On marque comme checké même si vide pour ne pas reboucler inutilement
-            # Mais attention, le cookie manager peut mettre du temps à répondre
-            if saved_uid is None: # extra-streamlit-components returns None if not ready or not found
-                 pass # On attend le prochain tour
-            else:
-                 st.session_state.cookie_checked = True
+        all_cookies = st.session_state.cookie_manager.get_all()
+        if all_cookies is not None: # CookieManager est prêt
+            saved_uid = all_cookies.get('mentor_sc_uid')
+            if saved_uid:
+                # Restaurer les données depuis le Cloud pour être sûr d'avoir l'historique et le classement
+                from core.database import pull_user_data_from_supabase
+                pull_user_data_from_supabase(saved_uid)
+                
+                res = run_query('SELECT * FROM users WHERE user_id=?', (saved_uid,), fetch_one=True)
+                if res:
+                    st.session_state.update({
+                        'auth':True, 'user_id':res[0], 'user':res[1], 'user_email': res[9], 'user_city': res[10],
+                        'level':int(res[2] or 1), 'xp':int(res[3] or 0), 'total_score':int(res[4] or 0),
+                        'mastery':int(res[5] or 0), 'q_count':int(res[6] or 0), 'hearts':int(res[7] or 3),
+                        'active_tab': 'mission',
+                        'cookie_checked': True
+                    })
+                    st.rerun()
+            st.session_state.cookie_checked = True
 
     # --- DÉTECTION ÉCHEC CRISE VIA URL (INFAILLIBLE) ---
     if st.query_params.get("status") == "crisis_fail":

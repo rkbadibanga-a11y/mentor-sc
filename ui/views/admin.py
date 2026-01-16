@@ -12,6 +12,12 @@ def render_admin_dashboard():
 
     with tab1:
         st.subheader("Base Utilisateurs")
+        
+        # Synchronisation complète pour l'admin
+        from core.database import sync_all_users_for_admin
+        with st.spinner("Récupération de tous les utilisateurs depuis le Cloud..."):
+            sync_all_users_for_admin()
+
         # Récupération de tous les utilisateurs
         users = run_query("SELECT user_id, name, email, level, xp, total_score, hearts, q_count, city, last_seen FROM users ORDER BY last_seen DESC", fetch_all=True)
         if users:

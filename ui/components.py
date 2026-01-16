@@ -135,7 +135,9 @@ def render_sidebar():
     
     st.markdown(f'''
         <div style="text-align:center;">
-            <h1 style="color: #00dfd8; margin-bottom: 0px; font-weight: 800; font-size: 2.2rem;">📦 Mentor SC</h1>
+            <a href="/" target="_self" style="text-decoration: none;">
+                <h1 style="color: #00dfd8; margin-bottom: 0px; font-weight: 800; font-size: 2.2rem;">📦 Mentor SC</h1>
+            </a>
             <div style="font-size: 1rem; font-weight: 500; color: #f1f5f9; margin-bottom: 15px; opacity: 0.8;">👤 {st.session_state.user}</div>
             <div style="background:rgba(30, 41, 59, 0.5); padding:8px; border-radius:12px; margin-top:5px; border:1px solid #334155; display: flex; align-items: center; justify-content: center; gap: 15px;">
                 <div style="text-align: left; border-right: 1px solid #334155; padding-right: 10px;">

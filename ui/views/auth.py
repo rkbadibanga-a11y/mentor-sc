@@ -17,6 +17,18 @@ def render_login():
         cm = stx.CookieManager(key="cookie_manager_auth_fallback")
 
     with login_placeholder.container():
+        # --- CHECK CLOUD STATUS (POUR DEBUG) ---
+        from core.database import DatabaseManager
+        sb = DatabaseManager.get_supabase()
+        cloud_status = "🟢 Cloud Actif" if sb else "🔴 Cloud Déconnecté"
+        cloud_color = "#10b981" if sb else "#ef4444"
+        
+        st.markdown(f"""
+            <div style="float: right; font-size: 0.7rem; color: {cloud_color}; font-weight: bold; opacity: 0.6;">
+                {cloud_status}
+            </div>
+        """, unsafe_allow_html=True)
+
         st.title("📦 Mentor SC")
         st.caption(t('welcome', lang))
         

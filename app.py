@@ -58,13 +58,14 @@ def main():
             })
             st.rerun()
 
-    # 4. RENDU
     if not st.session_state.auth:
         render_login()
     else:
         with st.sidebar:
             render_sidebar()
 
+        # Import différé pour gain de temps au boot
+        from utils.assets import trigger_queued_sounds
         trigger_queued_sounds()
         
         menu = {

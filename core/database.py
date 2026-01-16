@@ -109,8 +109,9 @@ def sync_generic_table(table, uid, params, query_type):
         pass
 
 def pull_shared_questions():
+    """Récupère les questions partagées (Lazy Loading - 15s delay)."""
     import time
-    time.sleep(5)
+    time.sleep(15)
     try:
         sb = DatabaseManager.get_supabase()
         if not sb: return

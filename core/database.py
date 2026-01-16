@@ -64,7 +64,23 @@ def run_query(query: str, params: tuple = (), fetch_one=False, fetch_all=False, 
                 
                 if table:
                     threading.Thread(target=sync_generic_table, args=(table, uid, params, q_upper), daemon=True).start()
+                    
+                    # --- NOUVEAU : ROULEMENT DES QUESTIONS (LIMIT 2000) ---
+                    if table == "question_bank":
+                        enforce_question_limit(2000)
     return result
+
+def enforce_question_limit(limit=2000):
+    """Maintient la base de données à un maximum de questions en supprimant les plus anciennes (FIFO)."""
+    try:
+        with DatabaseManager.session() as cursor:
+            cursor.execute("SELECT COUNT(*) FROM question_bank")
+            count = cursor.fetchone()[0]
+            if count > limit:
+                to_delete = count - limit
+                # On supprime les plus petits IDs (les plus anciens)
+                cursor.execute(f"DELETE FROM question_bank WHERE id IN (SELECT id FROM question_bank ORDER BY id ASC LIMIT {to_delete})")
+    except: pass
 
 def sync_generic_table(table, uid, params, query_type):
     """Synchronise une ligne spécifique vers une table Supabase (Mode Threadé)"""

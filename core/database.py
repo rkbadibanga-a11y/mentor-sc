@@ -24,12 +24,13 @@ class DatabaseManager:
         """Initialise le client Supabase pour la persistance Cloud."""
         url = os.getenv("SUPABASE_URL")
         key = os.getenv("SUPABASE_KEY")
-        if url and key:
-            try:
-                return create_client(url, key)
-            except:
-                return None
-        return None
+        if not url or not key:
+            return None
+        try:
+            return create_client(url, key)
+        except Exception as e:
+            st.error(f"❌ Erreur critique configuration Cloud : {e}")
+            return None
 
     @classmethod
     @contextmanager

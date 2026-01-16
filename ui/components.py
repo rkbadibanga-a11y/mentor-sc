@@ -109,6 +109,13 @@ INFOS TECHNIQUES :
 
 def render_sidebar():
     lang = st.session_state.get('lang', 'Français')
+    
+    # --- CHECK CLOUD STATUS ---
+    from core.database import DatabaseManager
+    sb = DatabaseManager.get_supabase()
+    cloud_status = "🟢 Connecté" if sb else "🔴 Déconnecté"
+    cloud_color = "#10b981" if sb else "#ef4444"
+
     # 1. Engine Display
     engine_display = st.session_state.get('current_engine', 'Auto')
         
@@ -130,11 +137,14 @@ def render_sidebar():
         <div style="text-align:center;">
             <h1 style="color: #00dfd8; margin-bottom: 0px; font-weight: 800; font-size: 2.2rem;">📦 Mentor SC</h1>
             <div style="font-size: 1rem; font-weight: 500; color: #f1f5f9; margin-bottom: 15px; opacity: 0.8;">👤 {st.session_state.user}</div>
-            <div style="background:rgba(30, 41, 59, 0.5); padding:8px; border-radius:12px; margin-top:5px; border:1px solid #334155; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                <span style="color:{status_color}; font-size: 1.2rem;">●</span> 
-                <div style="text-align: left;">
+            <div style="background:rgba(30, 41, 59, 0.5); padding:8px; border-radius:12px; margin-top:5px; border:1px solid #334155; display: flex; align-items: center; justify-content: center; gap: 15px;">
+                <div style="text-align: left; border-right: 1px solid #334155; padding-right: 10px;">
                     <div style="font-size:0.6rem; color:#64748b; font-weight: bold; letter-spacing: 1px;">STATUT IA</div>
                     <div style="font-size:0.75rem; font-family:monospace; color:{status_color}; font-weight: bold;">{status_text}</div>
+                </div>
+                <div style="text-align: left;">
+                    <div style="font-size:0.6rem; color:#64748b; font-weight: bold; letter-spacing: 1px;">CLOUD SYNC</div>
+                    <div style="font-size:0.75rem; font-family:monospace; color:{cloud_color}; font-weight: bold;">{cloud_status}</div>
                 </div>
             </div>
         </div>

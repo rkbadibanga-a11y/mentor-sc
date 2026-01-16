@@ -10,12 +10,6 @@ def render_login():
     login_placeholder = st.empty()
     lang = st.session_state.get('lang', 'Français')
     
-    # --- RÉCUPÉRATION DU COOKIE MANAGER GLOBAL ---
-    cm = st.session_state.get('cookie_manager')
-    if not cm:
-        import extra_streamlit_components as stx
-        cm = stx.CookieManager(key="cookie_manager_auth_fallback")
-
     with login_placeholder.container():
         # --- CHECK CLOUD STATUS (POUR DEBUG) ---
         from core.database import DatabaseManager
@@ -77,11 +71,7 @@ def render_login():
                         # Re-fetch local après le pull
                         res = run_query('SELECT * FROM users WHERE user_id=?', (user_id,), fetch_one=True)
                         
-                        st.query_params["uid"] = user_id # Sauvegarder dans l'URL
-                        
-                        # --- MODERNE : COOKIE PERSISTANT (30 jours) ---
-                        expires = datetime.now() + timedelta(days=30)
-                        cm.set('mentor_sc_uid', user_id, expires_at=expires)
+                        st.query_params["uid"] = user_id # Sauvegarder dans l'URL pour la persistance
                         
                         st.session_state.update({
                             'auth':True, 'user_id':user_id, 'user':res[1], 'user_email': email, 'user_city': res[10],
@@ -95,8 +85,6 @@ def render_login():
                             'data': None, 'question_queue': [], 'consecutive_wins': 0,
                             'active_tab': 'mission' # Force l'onglet Mission par défaut
                         })
-                        st.toast(f"Ravi de vous revoir, {res[1]} !")
-                        time.sleep(1)
                         st.rerun()
                     else:
                         st.session_state.temp_email = email
@@ -132,9 +120,7 @@ def render_login():
                         run_query('INSERT INTO users (user_id, name, email, city, hearts, joker_5050, joker_hint) VALUES (?,?,?,?,3,3,3)', 
                                  (uid, name, st.session_state.temp_email, city), commit=True)
                         
-                        # --- COOKIE PERSISTANT (30 jours) ---
-                        expires = datetime.now() + timedelta(days=30)
-                        cm.set('mentor_sc_uid', uid, expires_at=expires)
+                        st.query_params["uid"] = uid # Persistance URL
 
                         st.session_state.update({'auth':True, 'user_id':uid, 'user':name, 'user_email':st.session_state.temp_email, 'user_city': city, 'hearts': 3, 'joker_5050': 3, 'joker_hint': 3})
                         login_placeholder.empty()

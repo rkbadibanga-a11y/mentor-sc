@@ -77,9 +77,8 @@ def render_sidebar():
         st.toggle("🔊 Voix", key="mentor_voice")
         
         if st.button("🚪 Déconnexion", use_container_width=True):
-            st.session_state.logout_in_progress = True
-            if st.session_state.get('cookie_manager'): st.session_state.cookie_manager.delete('mentor_sc_uid')
-            st.session_state.auth = False
+            st.session_state.clear()
+            st.query_params.clear()
             st.rerun()
     
     st.markdown(SIGNATURE, unsafe_allow_html=True)

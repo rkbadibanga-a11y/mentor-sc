@@ -109,7 +109,6 @@ def sync_generic_table(table, uid, params, query_type):
         pass
 
 def pull_shared_questions():
-    """Récupère les questions partagées (Lazy Loading - 15s delay)."""
     import time
     time.sleep(15)
     try:
@@ -173,23 +172,24 @@ def init_db():
         'CREATE TABLE IF NOT EXISTS question_bank (id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT, concept TEXT, level INTEGER, question TEXT, options TEXT, correct TEXT, explanation TEXT, theory TEXT, example TEXT, tip TEXT, triad_id TEXT, triad_position INTEGER DEFAULT 0)',
         'CREATE TABLE IF NOT EXISTS glossary (user_id TEXT, term TEXT, definition TEXT, category TEXT, use_case TEXT, business_impact TEXT, short_definition TEXT, UNIQUE(user_id, term))',
         'CREATE TABLE IF NOT EXISTS notes (user_id TEXT, note_id TEXT PRIMARY KEY, title TEXT, content TEXT, timestamp TEXT)',
-                'CREATE TABLE IF NOT EXISTS difficulty_feedback (question_id INTEGER, hard_votes INTEGER DEFAULT 0, easy_votes INTEGER DEFAULT 0, PRIMARY KEY(question_id))',
-                'CREATE TABLE IF NOT EXISTS user_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, user_name TEXT, user_email TEXT, message TEXT, context TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)',
-                'CREATE TABLE IF NOT EXISTS ai_queue (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, question_json TEXT, category TEXT)'
-            ]
-            with DatabaseManager.session() as cursor:
-                for q in queries: cursor.execute(q)
-                
-                # Migrations user_feedback (ajout colonnes si manquantes)
-                try: cursor.execute("ALTER TABLE user_feedback ADD COLUMN user_name TEXT")
-                except: pass
-                try: cursor.execute("ALTER TABLE user_feedback ADD COLUMN user_email TEXT")
-                except: pass
-                try: cursor.execute("ALTER TABLE user_feedback ADD COLUMN context TEXT")
-                except: pass
+        'CREATE TABLE IF NOT EXISTS difficulty_feedback (question_id INTEGER, hard_votes INTEGER DEFAULT 0, easy_votes INTEGER DEFAULT 0, PRIMARY KEY(question_id))',
+        'CREATE TABLE IF NOT EXISTS user_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, user_name TEXT, user_email TEXT, message TEXT, context TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)',
+        'CREATE TABLE IF NOT EXISTS ai_queue (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, question_json TEXT, category TEXT)'
+    ]
+    with DatabaseManager.session() as cursor:
+        for q in queries:
+            cursor.execute(q)
         
-                cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_user ON history(user_id)")
-        
+        # Migrations user_feedback
+        try: cursor.execute("ALTER TABLE user_feedback ADD COLUMN user_name TEXT")
+        except: pass
+        try: cursor.execute("ALTER TABLE user_feedback ADD COLUMN user_email TEXT")
+        except: pass
+        try: cursor.execute("ALTER TABLE user_feedback ADD COLUMN context TEXT")
+        except: pass
+
+        # Indexation
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_user ON history(user_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_qhash ON history(question_hash)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_composite ON history(user_id, question_hash)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_qbank_lvl_cat ON question_bank(level, category)")
@@ -212,56 +212,31 @@ def init_db():
     return True
 
 def sync_leaderboard_from_supabase(limit=20):
-
     sb = DatabaseManager.get_supabase()
-
     if not sb: return
-
     try:
-
         res = sb.table("users").select("user_id, name, level, total_score, city").order("level", desc=True).limit(limit).execute()
-
         if res.data:
-
             with DatabaseManager.session() as cursor:
-
-                for u in res.data: cursor.execute("INSERT OR REPLACE INTO users (user_id, name, level, total_score, city) VALUES (?, ?, ?, ?, ?)", (u['user_id'], u['name'], u.get('level', 1), u.get('total_score', 0), u.get('city', '')))
-
+                for u in res.data:
+                    cursor.execute("INSERT OR REPLACE INTO users (user_id, name, level, total_score, city) VALUES (?, ?, ?, ?, ?)", (u['user_id'], u['name'], u.get('level', 1), u.get('total_score', 0), u.get('city', '')))
     except:
-
         pass
 
-
-
 def sync_all_users_for_admin():
-
-    """Synchronise l'intégralité des utilisateurs pour le dashboard admin."""
-
     try:
-
         sb = DatabaseManager.get_supabase()
-
         if not sb: return
-
         res = sb.table("users").select("*").execute()
-
         if res.data:
-
             with DatabaseManager.session() as cursor:
-
                 for u in res.data:
-
                     cursor.execute("INSERT OR REPLACE INTO users (user_id, name, level, xp, total_score, mastery, q_count, hearts, email, city, crisis_wins, has_diploma, joker_5050, joker_hint) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", 
-
                                  (u['user_id'], u['name'], u.get('level', 1), u.get('xp', 0), u.get('total_score', 0), u.get('mastery', 0), u.get('q_count', 0), u.get('hearts', 5), u.get('email'), u.get('city', ''), u.get('crisis_wins', 0), u.get('has_diploma', 0), u.get('joker_5050', 3), u.get('joker_hint', 3)))
-
-    except: pass
-
-
+    except:
+        pass
 
 def get_leaderboard(sync=False):
-
-
     if sync:
         threading.Thread(target=sync_leaderboard_from_supabase, daemon=True).start()
     return run_query('SELECT name, total_score, level FROM users ORDER BY level DESC, total_score DESC LIMIT 10', fetch_all=True)

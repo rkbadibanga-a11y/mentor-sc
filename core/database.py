@@ -117,7 +117,9 @@ def sync_generic_table(table, uid, params, query_type):
     except: pass
 
 def pull_shared_questions():
-    """Récupère les questions générées par les autres joueurs sur le Cloud."""
+    """Récupère les questions générées par les autres joueurs sur le Cloud (Lazy Loading)."""
+    import time
+    time.sleep(5) # Attente pour laisser le démarrage être instantané
     try:
         sb = DatabaseManager.get_supabase()
         if not sb: return
@@ -125,9 +127,8 @@ def pull_shared_questions():
         if res.data:
             with DatabaseManager.session() as cursor:
                 for q in res.data:
-                    # On insère uniquement si la question n'existe pas localement (IGNORE)
                     cursor.execute("INSERT OR IGNORE INTO question_bank (category, level, question, options, correct, explanation) VALUES (?,?,?,?,?,?)",
-                                 (q.get('category'), q.get('level'), q.get('question'), q.get('options'), q.get('correct'), q.get('explanation')))
+                                 (q['category'], q['level'], q['question'], q['options'], q['correct'], q['explanation']))
     except: pass
 
 @st.cache_resource
@@ -204,6 +205,13 @@ def init_db():
     with DatabaseManager.session() as cursor:
         for q in queries:
             cursor.execute(q)
+        
+        # --- NOUVEAU : INDEXATION POUR VITESSE MAX ---
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_user ON history(user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_qhash ON history(question_hash)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_composite ON history(user_id, question_hash)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_qbank_lvl_cat ON question_bank(level, category)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stats_user ON stats(user_id)")
         
         cursor.execute("SELECT COUNT(*) FROM question_bank")
         if cursor.fetchone()[0] == 0:

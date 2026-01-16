@@ -167,12 +167,12 @@ def render_profile(uid: str):
         
         with c1:
             st.success("Vous avez complété l'intégralité du cursus Elite Supply Chain.")
-            pdf_data = generate_certificate_pdf(name, date_str, f"{base_path}/fond-certificat-pdf.jpg")
+            pdf_data = generate_certificate_pdf(name, date_str, f"{base_path}/fond-certificat-pdf.webp")
             if pdf_data:
                 st.download_button("📥 Télécharger mon Diplôme (PDF)", data=pdf_data, file_name=f"Certificat_SC_{name}.pdf", mime="application/pdf", use_container_width=True)
         
         with c2:
-            img_b64 = get_base64_image(f"{base_path}/fond-certificat.jpg")
+            img_b64 = get_base64_image(f"{base_path}/fond-certificat.webp")
             st.components.v1.html(get_certificate_html(name, date_str, img_b64), height=300)
 
     # Zone de test pour forcer l'obtention (Réservé Admin)

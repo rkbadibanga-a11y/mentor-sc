@@ -114,10 +114,14 @@ def render_coach():
                 for char in response:
                     displayed_text += char
                     resp_box.markdown(displayed_text + "▌")
-                    time.sleep(0.03) # Vitesse de frappe ralentie
+                    time.sleep(0.01) # Vitesse de frappe accélérée pour perf
                 resp_box.markdown(displayed_text)
                 
+                # Mise à jour de l'historique (Limitation à 10 messages pour perf mémoire)
                 st.session_state.chat_history.append({"role": "assistant", "content": response})
+                if len(st.session_state.chat_history) > 10:
+                    st.session_state.chat_history = st.session_state.chat_history[-10:]
+                
                 time.sleep(1) 
                 st.rerun()
 

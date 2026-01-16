@@ -47,7 +47,32 @@ class QuizEngine:
         return None
 
     def manage_queue(self):
-        return self.get_question_from_db(st.session_state.level)
+        # 1. Tenter la DB
+        q = self.get_question_from_db(st.session_state.level)
+        if q: return q
+        
+        # 2. Si vide, on génère à la volée (Fallback IA)
+        mn, _, _, lvl = self.get_current_module_info(st.session_state.q_count)
+        prompt = f"Génère 1 QCM Supply Chain sur '{mn}' niveau {lvl}/4. JSON: {{'question':'...', 'options':{{'A':'..','B':'..','C':'..','D':'..'}}, 'correct':'A', 'explanation':'...', 'category':'{mn}'}}"
+        raw, _ = self.ai.get_response(prompt)
+        
+        if raw:
+            try:
+                # Nettoyage JSON
+                raw = raw.replace("```json", "").replace("```", "").strip()
+                q_data = json.loads(raw)
+                # Sauvegarde immédiate pour la prochaine fois
+                run_query('INSERT INTO question_bank (category, level, question, options, correct, explanation) VALUES (?,?,?,?,?,?)',
+                         (mn, lvl, q_data['question'], json.dumps(q_data['options']), q_data['correct'], q_data['explanation']), commit=True)
+                return {
+                    "id": None, # Pas d'ID encore
+                    "question": q_data['question'], "options": q_data['options'],
+                    "correct": q_data['correct'], "explanation": q_data['explanation'],
+                    "category": mn
+                }
+            except: pass
+            
+        return None
 
     def validate_answer(self, choice, q_data):
         uid = st.session_state.user_id

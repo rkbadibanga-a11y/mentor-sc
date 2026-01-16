@@ -63,13 +63,16 @@ def render_sidebar():
         </div>
     """, unsafe_allow_html=True)
 
-    # BOUTON SOIN RAPIDE (SIDEBAR)
-    if hearts < 5 and st.session_state.get('xp', 0) >= 50:
-        if st.button("💊 Soin (+1) - 50 XP", use_container_width=True):
-            st.session_state.hearts += 1
-            st.session_state.xp -= 50
-            run_query('UPDATE users SET hearts=?, xp=? WHERE user_id=?', (st.session_state.hearts, st.session_state.xp, st.session_state.user_id), commit=True)
-            st.rerun()
+    # BOUTON SOIN (ACCÈS PERMANENT)
+    heal_cost = 150
+    can_afford = st.session_state.get('xp', 0) >= heal_cost
+    needs_heal = hearts < 5
+    
+    if st.button(f"💊 Soin (+1) - {heal_cost} XP", use_container_width=True, disabled=not (can_afford and needs_heal)):
+        st.session_state.hearts += 1
+        st.session_state.xp -= heal_cost
+        run_query('UPDATE users SET hearts=?, xp=? WHERE user_id=?', (st.session_state.hearts, st.session_state.xp, st.session_state.user_id), commit=True)
+        st.rerun()
 
     c1, c2 = st.columns(2)
     c1.metric("🎖️ Niveau", st.session_state.level)

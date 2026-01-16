@@ -203,18 +203,56 @@ def init_db():
     return True
 
 def sync_leaderboard_from_supabase(limit=20):
+
     sb = DatabaseManager.get_supabase()
+
     if not sb: return
+
     try:
+
         res = sb.table("users").select("user_id, name, level, total_score, city").order("level", desc=True).limit(limit).execute()
+
         if res.data:
+
             with DatabaseManager.session() as cursor:
-                for u in res.data:
-                    cursor.execute("INSERT OR REPLACE INTO users (user_id, name, level, total_score, city) VALUES (?, ?, ?, ?, ?)", (u['user_id'], u['name'], u.get('level', 1), u.get('total_score', 0), u.get('city', '')))
+
+                for u in res.data: cursor.execute("INSERT OR REPLACE INTO users (user_id, name, level, total_score, city) VALUES (?, ?, ?, ?, ?)", (u['user_id'], u['name'], u.get('level', 1), u.get('total_score', 0), u.get('city', '')))
+
     except:
+
         pass
 
+
+
+def sync_all_users_for_admin():
+
+    """Synchronise l'intégralité des utilisateurs pour le dashboard admin."""
+
+    try:
+
+        sb = DatabaseManager.get_supabase()
+
+        if not sb: return
+
+        res = sb.table("users").select("*").execute()
+
+        if res.data:
+
+            with DatabaseManager.session() as cursor:
+
+                for u in res.data:
+
+                    cursor.execute("INSERT OR REPLACE INTO users (user_id, name, level, xp, total_score, mastery, q_count, hearts, email, city, crisis_wins, has_diploma, joker_5050, joker_hint) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", 
+
+                                 (u['user_id'], u['name'], u.get('level', 1), u.get('xp', 0), u.get('total_score', 0), u.get('mastery', 0), u.get('q_count', 0), u.get('hearts', 5), u.get('email'), u.get('city', ''), u.get('crisis_wins', 0), u.get('has_diploma', 0), u.get('joker_5050', 3), u.get('joker_hint', 3)))
+
+    except: pass
+
+
+
 def get_leaderboard(sync=False):
+
+
     if sync:
         threading.Thread(target=sync_leaderboard_from_supabase, daemon=True).start()
     return run_query('SELECT name, total_score, level FROM users ORDER BY level DESC, total_score DESC LIMIT 10', fetch_all=True)

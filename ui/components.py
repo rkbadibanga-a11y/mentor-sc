@@ -216,7 +216,14 @@ def render_sidebar():
         if st.button(t('logout', lang), use_container_width=True):
             cm = st.session_state.get('cookie_manager')
             if cm: cm.delete('mentor_sc_uid')
-            st.session_state.clear()
+            
+            # Suppression chirurgicale pour éviter la reconnexion auto immédiate
+            for key in list(st.session_state.keys()):
+                if key not in ['cookie_manager', 'lang', 'mentor_voice']:
+                    del st.session_state[key]
+            
+            st.session_state.auth = False
+            st.session_state.cookie_checked = True # Empêche le auto-login au prochain tour
             st.query_params.clear() # Nettoyer l'URL
             st.rerun()            
         
@@ -230,7 +237,15 @@ def render_sidebar():
             cm = st.session_state.get('cookie_manager')
             if cm: cm.delete('mentor_sc_uid')
             run_query("DELETE FROM users WHERE user_id=?", (st.session_state.user_id,), commit=True)
-            st.session_state.clear()
+            
+            # Suppression chirurgicale
+            for key in list(st.session_state.keys()):
+                if key not in ['cookie_manager', 'lang', 'mentor_voice']:
+                    del st.session_state[key]
+            
+            st.session_state.auth = False
+            st.session_state.cookie_checked = True
+            st.query_params.clear()
             st.rerun()
     
     st.markdown(SIGNATURE, unsafe_allow_html=True)

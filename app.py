@@ -47,12 +47,9 @@ def main():
         handle_google_callback()
 
     # --- AUTO LOGIN VIA URL (FAST & STABLE) ---
-    # On privilégie la persistance par l'URL pour la vitesse et la fiabilité
     if not st.session_state.auth and 'uid' in st.query_params:
         uid = st.query_params['uid']
         res = run_query('SELECT * FROM users WHERE user_id=?', (uid,), fetch_one=True)
-        
-        # Tentative Cloud
         if not res:
             from core.database import pull_user_data_from_supabase
             pull_user_data_from_supabase(uid)
@@ -63,8 +60,7 @@ def main():
                 'auth':True, 'user_id':res[0], 'user':res[1], 'user_email': res[9], 'user_city': res[10],
                 'level':int(res[2] or 1), 'xp':int(res[3] or 0), 'total_score':int(res[4] or 0),
                 'mastery':int(res[5] or 0), 'q_count':int(res[6] or 0), 'hearts':int(res[7] or 3),
-                'active_tab': 'mission',
-                'data': None # Reset pour éviter les conflits
+                'active_tab': 'mission', 'data': None
             })
             st.rerun()
 

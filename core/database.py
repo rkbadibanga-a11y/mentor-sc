@@ -48,15 +48,68 @@ def run_query(query: str, params: tuple = (), fetch_one=False, fetch_all=False, 
     if commit:
         q_upper = query.upper()
         uid = st.session_state.get('user_id') or (params[0] if params else None)
-        if uid and ("UPDATE USERS" in q_upper or "INSERT INTO HISTORY" in q_upper):
-            threading.Thread(target=sync_user_to_supabase, args=(uid,), daemon=True).start()
+        
+        # --- SYNCHRONISATION CLOUD INTELLIGENTE ---
+        if uid:
+            if "UPDATE USERS" in q_upper:
+                threading.Thread(target=sync_user_to_supabase, args=(uid,), daemon=True).start()
+            
+            elif "INSERT" in q_upper or "UPDATE" in q_upper:
+                table = None
+                if "HISTORY" in q_upper: table = "history"
+                elif "GLOSSARY" in q_upper: table = "glossary"
+                elif "NOTES" in q_upper: table = "notes"
+                elif "STATS" in q_upper: table = "stats"
+                
+                if table:
+                    # On lance un thread générique pour sync la table
+                    threading.Thread(target=sync_generic_table, args=(table, uid, params, q_upper), daemon=True).start()
     return result
+
+def sync_generic_table(table, uid, params, query_type):
+    """Synchronise une ligne spécifique vers une table Supabase (Mode Threadé)"""
+    try:
+        sb = DatabaseManager.get_supabase()
+        if not sb: return
+
+        data = {}
+        if table == "history":
+            # INSERT INTO history (user_id, question_hash) VALUES (?, ?)
+            # params[1] est le hash
+            q_hash = params[1] if len(params) > 1 else ""
+            data = {"user_id": uid, "question_hash": q_hash}
+            
+        elif table == "glossary":
+            # INSERT ... glossary ... VALUES (?, ?, ?, ...)
+            # Term est souvent le 2ème param (index 1)
+            term = params[1] if len(params) > 1 else ""
+            # On récupère la ligne complète depuis la DB locale pour être sûr
+            with DatabaseManager.session() as cursor:
+                cursor.execute("SELECT * FROM glossary WHERE user_id=? AND term=?", (uid, term))
+                res = cursor.fetchone()
+            if res:
+                data = {
+                    "user_id": res[0], "term": res[1], "definition": res[2], 
+                    "category": res[3], "use_case": res[4], "business_impact": res[5], "short_definition": res[6]
+                }
+
+        elif table == "notes":
+            # UPDATE notes ... OR INSERT ...
+            # On utilise le note_id pour récupérer la donnée fraîche
+            # C'est compliqué de parser les params, mieux vaut relire la DB
+            # On suppose que l'appli met à jour une note active
+            pass # TODO: Implémenter sync notes plus tard si critique
+
+        if data:
+            sb.table(table).upsert(data).execute()
+    except: pass
 
 @st.cache_data(ttl=3600)
 def pull_user_data_from_supabase(user_id):
     sb = DatabaseManager.get_supabase()
     if not sb: return False
     try:
+        # 1. USERS
         res = sb.table("users").select("*").eq("user_id", user_id).execute()
         if res.data:
             u = res.data[0]
@@ -70,6 +123,13 @@ def pull_user_data_from_supabase(user_id):
                 u.get('hearts', 5), u.get('email'), u.get('city', ''), u.get('crisis_wins', 0),
                 u.get('has_diploma', 0), u.get('joker_5050', 3), u.get('joker_hint', 3)
             ), commit=False)
+            
+            # 2. GLOSSARY (Restauration)
+            res_g = sb.table("glossary").select("*").eq("user_id", user_id).execute()
+            for g in res_g.data:
+                run_query("INSERT OR REPLACE INTO glossary (user_id, term, definition, category, use_case, business_impact, short_definition) VALUES (?,?,?,?,?,?,?)",
+                         (g['user_id'], g['term'], g['definition'], g['category'], g.get('use_case'), g.get('business_impact'), g.get('short_definition')), commit=False)
+
             return True
     except: pass
     return False
@@ -94,11 +154,22 @@ def sync_user_to_supabase(user_id):
 
 @st.cache_resource
 def init_db():
+    queries = [
+        'CREATE TABLE IF NOT EXISTS users (user_id TEXT PRIMARY KEY, name TEXT, level INTEGER DEFAULT 1, xp INTEGER DEFAULT 0, total_score INTEGER DEFAULT 0, mastery INTEGER DEFAULT 0, q_count INTEGER DEFAULT 0, hearts INTEGER DEFAULT 5, last_seen TEXT, email TEXT UNIQUE, city TEXT, referred_by TEXT, xp_checkpoint INTEGER DEFAULT 0, crisis_wins INTEGER DEFAULT 0, redemptions INTEGER DEFAULT 0, has_diploma INTEGER DEFAULT 0, current_run_xp INTEGER DEFAULT 0, joker_5050 INTEGER DEFAULT 3, joker_hint INTEGER DEFAULT 3)',
+        'CREATE TABLE IF NOT EXISTS history (user_id TEXT, question_hash TEXT, UNIQUE(user_id, question_hash))',
+        'CREATE TABLE IF NOT EXISTS stats (user_id TEXT, category TEXT, correct_count INTEGER, UNIQUE(user_id, category))',
+        'CREATE TABLE IF NOT EXISTS question_bank (id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT, concept TEXT, level INTEGER, question TEXT, options TEXT, correct TEXT, explanation TEXT, theory TEXT, example TEXT, tip TEXT, triad_id TEXT, triad_position INTEGER DEFAULT 0)',
+        # --- TABLES RESTAURÉES ---
+        'CREATE TABLE IF NOT EXISTS glossary (user_id TEXT, term TEXT, definition TEXT, category TEXT, use_case TEXT, business_impact TEXT, short_definition TEXT, UNIQUE(user_id, term))',
+        'CREATE TABLE IF NOT EXISTS notes (user_id TEXT, note_id TEXT PRIMARY KEY, title TEXT, content TEXT, timestamp TEXT)',
+        'CREATE TABLE IF NOT EXISTS difficulty_feedback (question_id INTEGER, hard_votes INTEGER DEFAULT 0, easy_votes INTEGER DEFAULT 0, PRIMARY KEY(question_id))',
+        'CREATE TABLE IF NOT EXISTS user_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, message TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)',
+        'CREATE TABLE IF NOT EXISTS ai_queue (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, question_json TEXT, category TEXT)'
+    ]
+    
     with DatabaseManager.session() as cursor:
-        cursor.execute('CREATE TABLE IF NOT EXISTS users (user_id TEXT PRIMARY KEY, name TEXT, level INTEGER DEFAULT 1, xp INTEGER DEFAULT 0, total_score INTEGER DEFAULT 0, mastery INTEGER DEFAULT 0, q_count INTEGER DEFAULT 0, hearts INTEGER DEFAULT 5, last_seen TEXT, email TEXT UNIQUE, city TEXT, referred_by TEXT, xp_checkpoint INTEGER DEFAULT 0, crisis_wins INTEGER DEFAULT 0, redemptions INTEGER DEFAULT 0, has_diploma INTEGER DEFAULT 0, current_run_xp INTEGER DEFAULT 0, joker_5050 INTEGER DEFAULT 3, joker_hint INTEGER DEFAULT 3)')
-        cursor.execute('CREATE TABLE IF NOT EXISTS history (user_id TEXT, question_hash TEXT, UNIQUE(user_id, question_hash))')
-        cursor.execute('CREATE TABLE IF NOT EXISTS stats (user_id TEXT, category TEXT, correct_count INTEGER, UNIQUE(user_id, category))')
-        cursor.execute('CREATE TABLE IF NOT EXISTS question_bank (id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT, concept TEXT, level INTEGER, question TEXT, options TEXT, correct TEXT, explanation TEXT, theory TEXT, example TEXT, tip TEXT, triad_id TEXT, triad_position INTEGER DEFAULT 0)')
+        for q in queries:
+            cursor.execute(q)
         
         cursor.execute("SELECT COUNT(*) FROM question_bank")
         if cursor.fetchone()[0] == 0:
@@ -111,7 +182,7 @@ def init_db():
                                      (q.get('category'), q.get('concept'), q.get('level'), q.get('question'), json.dumps(q.get('options')), q.get('correct'), q.get('explanation'), q.get('triad_id'), q.get('triad_position')))
     return True
 
-# --- LEADERBOARD & SYNC FUNCTIONS (Restauration) ---
+# --- LEADERBOARD ---
 
 def sync_leaderboard_from_supabase(limit=20):
     sb = DatabaseManager.get_supabase()

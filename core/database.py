@@ -173,14 +173,23 @@ def init_db():
         'CREATE TABLE IF NOT EXISTS question_bank (id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT, concept TEXT, level INTEGER, question TEXT, options TEXT, correct TEXT, explanation TEXT, theory TEXT, example TEXT, tip TEXT, triad_id TEXT, triad_position INTEGER DEFAULT 0)',
         'CREATE TABLE IF NOT EXISTS glossary (user_id TEXT, term TEXT, definition TEXT, category TEXT, use_case TEXT, business_impact TEXT, short_definition TEXT, UNIQUE(user_id, term))',
         'CREATE TABLE IF NOT EXISTS notes (user_id TEXT, note_id TEXT PRIMARY KEY, title TEXT, content TEXT, timestamp TEXT)',
-        'CREATE TABLE IF NOT EXISTS difficulty_feedback (question_id INTEGER, hard_votes INTEGER DEFAULT 0, easy_votes INTEGER DEFAULT 0, PRIMARY KEY(question_id))',
-        'CREATE TABLE IF NOT EXISTS user_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, message TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)',
-        'CREATE TABLE IF NOT EXISTS ai_queue (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, question_json TEXT, category TEXT)'
-    ]
-    with DatabaseManager.session() as cursor:
-        for q in queries:
-            cursor.execute(q)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_user ON history(user_id)")
+                'CREATE TABLE IF NOT EXISTS difficulty_feedback (question_id INTEGER, hard_votes INTEGER DEFAULT 0, easy_votes INTEGER DEFAULT 0, PRIMARY KEY(question_id))',
+                'CREATE TABLE IF NOT EXISTS user_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, user_name TEXT, user_email TEXT, message TEXT, context TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)',
+                'CREATE TABLE IF NOT EXISTS ai_queue (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, question_json TEXT, category TEXT)'
+            ]
+            with DatabaseManager.session() as cursor:
+                for q in queries: cursor.execute(q)
+                
+                # Migrations user_feedback (ajout colonnes si manquantes)
+                try: cursor.execute("ALTER TABLE user_feedback ADD COLUMN user_name TEXT")
+                except: pass
+                try: cursor.execute("ALTER TABLE user_feedback ADD COLUMN user_email TEXT")
+                except: pass
+                try: cursor.execute("ALTER TABLE user_feedback ADD COLUMN context TEXT")
+                except: pass
+        
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_user ON history(user_id)")
+        
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_qhash ON history(question_hash)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_composite ON history(user_id, question_hash)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_qbank_lvl_cat ON question_bank(level, category)")

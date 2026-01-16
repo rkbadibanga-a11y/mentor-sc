@@ -72,7 +72,17 @@ class QuizEngine:
                 }
             except: pass
             
-        return None
+        # 3. ULTIMATE FAILSAFE (Si DB vide et IA HS)
+        # On renvoie une question statique pour débloquer l'utilisateur
+        return {
+            "id": None,
+            "question": "Question de secours : Quel est le flux qui remonte du client vers le fournisseur ?",
+            "options": {"A": "Flux Financier", "B": "Flux Physique", "C": "Flux d'Information", "D": "Flux Logistique Inverse (Reverse)"},
+            "correct": "D",
+            "explanation": "C'est la Logistique Inverse (Reverse Logistics), qui gère les retours, le SAV et le recyclage.",
+            "category": "Fondamentaux",
+            "concept": "Reverse Logistics"
+        }
 
     def validate_answer(self, choice, q_data):
         uid = st.session_state.user_id

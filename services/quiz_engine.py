@@ -73,22 +73,19 @@ class QuizEngine:
             run_query("DELETE FROM ai_queue WHERE id=?", (buffered[0],), commit=True)
             return json.loads(buffered[1])
 
-        # 2. Si buffer vide (Démarrage ou urgence) : PRIORITÉ VITESSE ABSOLUE
-        # On tape directement dans le stock local (0 latence)
+        # 2. Si buffer vide : PRIORITÉ VITESSE ABSOLUE
         q_db = self.get_question_from_db(st.session_state.level)
         if q_db: return q_db
         
-        # 3. Dernier recours (si DB vide et buffer vide) : On est obligé d'attendre l'IA
         return self.generate_ai_question()
 
     def prefetch_next_question(self, uid):
-        """Tâche de fond : Prépare la prochaine question dans ai_queue."""
-        # On vérifie si la file est déjà pleine (max 2 questions d'avance pour pas gâcher)
+        """Tâche de fond : Prépare la prochaine question (IA ou DB)"""
         count = run_query("SELECT COUNT(*) FROM ai_queue WHERE user_id=?", (uid,), fetch_one=True)[0]
         if count >= 2: return
 
-        # Logique de sélection (IA ou DB)
-        use_ai = random.random() < 0.40
+        # LOGIQUE 80/20 (20% IA, 80% DB)
+        use_ai = random.random() < 0.20
         q_data = None
         
         if not use_ai:

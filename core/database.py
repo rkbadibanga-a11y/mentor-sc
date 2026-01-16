@@ -60,9 +60,9 @@ def run_query(query: str, params: tuple = (), fetch_one=False, fetch_all=False, 
                 elif "GLOSSARY" in q_upper: table = "glossary"
                 elif "NOTES" in q_upper: table = "notes"
                 elif "STATS" in q_upper: table = "stats"
+                elif "QUESTION_BANK" in q_upper: table = "question_bank"
                 
                 if table:
-                    # On lance un thread générique pour sync la table
                     threading.Thread(target=sync_generic_table, args=(table, uid, params, q_upper), daemon=True).start()
     return result
 
@@ -74,16 +74,19 @@ def sync_generic_table(table, uid, params, query_type):
 
         data = {}
         if table == "history":
-            # INSERT INTO history (user_id, question_hash) VALUES (?, ?)
-            # params[1] est le hash
             q_hash = params[1] if len(params) > 1 else ""
             data = {"user_id": uid, "question_hash": q_hash}
             
+        elif table == "question_bank":
+            # INSERT INTO question_bank (category, level, question, options, correct, explanation)
+            # params: (mn, lvl, q_data['question'], json.dumps(q_data['options']), q_data['correct'], q_data['explanation'])
+            data = {
+                "category": params[0], "level": params[1], "question": params[2],
+                "options": params[3], "correct": params[4], "explanation": params[5]
+            }
+
         elif table == "glossary":
-            # INSERT ... glossary ... VALUES (?, ?, ?, ...)
-            # Term est souvent le 2ème param (index 1)
             term = params[1] if len(params) > 1 else ""
-            # On récupère la ligne complète depuis la DB locale pour être sûr
             with DatabaseManager.session() as cursor:
                 cursor.execute("SELECT * FROM glossary WHERE user_id=? AND term=?", (uid, term))
                 res = cursor.fetchone()
@@ -93,16 +96,31 @@ def sync_generic_table(table, uid, params, query_type):
                     "category": res[3], "use_case": res[4], "business_impact": res[5], "short_definition": res[6]
                 }
 
-        elif table == "notes":
-            # UPDATE notes ... OR INSERT ...
-            # On utilise le note_id pour récupérer la donnée fraîche
-            # C'est compliqué de parser les params, mieux vaut relire la DB
-            # On suppose que l'appli met à jour une note active
-            pass # TODO: Implémenter sync notes plus tard si critique
-
         if data:
             sb.table(table).upsert(data).execute()
     except: pass
+
+def pull_shared_questions():
+    """Récupère les questions générées par les autres joueurs sur le Cloud."""
+    try:
+        sb = DatabaseManager.get_supabase()
+        if not sb: return
+        res = sb.table("question_bank").select("*").order("id", desc=True).limit(50).execute()
+        if res.data:
+            with DatabaseManager.session() as cursor:
+                for q in res.data:
+                    # On insère uniquement si la question n'existe pas localement (IGNORE)
+                    cursor.execute("INSERT OR IGNORE INTO question_bank (category, level, question, options, correct, explanation) VALUES (?,?,?,?,?,?)",
+                                 (q.get('category'), q.get('level'), q.get('question'), q.get('options'), q.get('correct'), q.get('explanation')))
+    except: pass
+
+@st.cache_resource
+def init_db():
+    # Récupération des questions partagées en arrière-plan au démarrage
+    threading.Thread(target=pull_shared_questions, daemon=True).start()
+    
+    queries = [
+
 
 @st.cache_data(ttl=3600)
 def pull_user_data_from_supabase(user_id):

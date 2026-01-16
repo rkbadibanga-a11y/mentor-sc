@@ -78,8 +78,21 @@ def render_sidebar():
     c1.metric("🎖️ Niveau", st.session_state.level)
     c2.metric("✨ XP", st.session_state.xp)
     
-    st.caption(f"Maîtrise : {st.session_state.get('mastery', 0)}%")
+    # --- NOUVEAU : INDIGATEUR PROCHAIN NIVEAU & STREAK ---
+    from core.config import LEVEL_THRESHOLDS
+    next_lvl = st.session_state.level + 1
+    xp_target = LEVEL_THRESHOLDS.get(next_lvl, 9999)
+    xp_left = max(0, xp_target - st.session_state.xp)
+    streak = st.session_state.get('consecutive_wins', 0)
+    
+    col_s1, col_s2 = st.columns([0.6, 0.4])
+    if xp_left > 0 and next_lvl <= 5:
+        col_s1.caption(f"🚀 **{xp_left} XP** avant Niv. {next_lvl}")
+    if streak >= 3:
+        col_s2.markdown(f"<span style='color:#ff9800; font-weight:bold;'>🔥 Série: {streak}</span>", unsafe_allow_html=True)
+
     st.progress(st.session_state.get('mastery', 0)/100)
+    st.caption(f"Maîtrise Globale : {st.session_state.get('mastery', 0)}%")
     
     # Leaderboard (Local only for speed)
     with st.expander("🏆 Top 5 Experts"):

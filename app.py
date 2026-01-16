@@ -19,34 +19,28 @@ from ui.views.glossary import render_glossary
 from ui.views.tools import render_tools
 from ui.views.admin import render_admin_dashboard
 from utils.assets import trigger_queued_sounds
-import extra_streamlit_components as stx
 
 def main():
     st.set_page_config(page_title="Mentor SC", page_icon="📦", layout="wide")
     apply_styles()
     
-    # 1. INITIALISATION ROBUSTE
-    defaults = {
-        'auth': False, 'user': '', 'user_id': '', 'level': 1, 'xp': 0, 'hearts': 5,
-        'q_count': 0, 'mastery': 0, 'total_score': 0, 'active_tab': 'mission',
-        'question_queue': [], 'chat_history': [], 'data': None,
-        'mentor_voice': True, 'crisis_active': False, 'answered': False,
-        'initialized': False
-    }
-    for k, v in defaults.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
-            
-    if not st.session_state.initialized:
+    # 1. INITIALISATION
+    if 'initialized' not in st.session_state:
+        st.session_state.update({
+            'auth': False, 'user': '', 'user_id': '', 'level': 1, 'xp': 0, 'hearts': 5,
+            'q_count': 0, 'mastery': 0, 'total_score': 0, 'active_tab': 'mission',
+            'question_queue': [], 'chat_history': [], 'data': None,
+            'mentor_voice': True, 'crisis_active': False, 'answered': False,
+            'initialized': True
+        })
         init_db()
-        st.session_state.initialized = True
 
     # --- CALLBACK GOOGLE ---
     if "code" in st.query_params:
         from services.auth_google import handle_google_callback
         handle_google_callback()
 
-    # --- AUTO LOGIN VIA URL (FAST & STABLE) ---
+    # --- AUTO LOGIN VIA URL ---
     if not st.session_state.auth and 'uid' in st.query_params:
         uid = st.query_params['uid']
         res = run_query('SELECT * FROM users WHERE user_id=?', (uid,), fetch_one=True)
@@ -78,6 +72,7 @@ def main():
             "tools": "🛠️ Outils", "glossary": "📖 Glossaire", "notes": "📝 Notes", 
             "profile": "📊 Profil", "leaderboard": "🏆 Top"
         }
+        
         if st.session_state.get('user_email') in os.getenv("ADMIN_EMAILS", ["r.k.badibanga@gmail.com"]):
             menu["admin"] = "👮 Admin"
 

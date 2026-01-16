@@ -40,7 +40,22 @@ def render_login():
                 if not email or "@" not in email:
                     st.warning("Veuillez entrer une adresse email valide.")
                 else:
+                    # 1. Tenter de trouver l'utilisateur localement
                     res = run_query('SELECT * FROM users WHERE email=?', (email,), fetch_one=True)
+                    
+                    # 2. Si absent localement, tenter de le trouver sur Supabase via l'email
+                    if not res:
+                        from core.database import DatabaseManager
+                        sb = DatabaseManager.get_supabase()
+                        if sb:
+                            cloud_res = sb.table("users").select("*").eq("email", email).execute()
+                            if cloud_res.data:
+                                user_id = cloud_res.data[0]['user_id']
+                                from core.database import pull_user_data_from_supabase
+                                pull_user_data_from_supabase(user_id)
+                                # Re-fetch local après le pull
+                                res = run_query('SELECT * FROM users WHERE user_id=?', (user_id,), fetch_one=True)
+
                     if res:
                         user_id = res[0]
                         # Restaurer les données depuis le Cloud pour être sûr d'avoir l'historique

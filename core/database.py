@@ -49,10 +49,10 @@ def run_query(query: str, params: tuple = (), fetch_one=False, fetch_all=False, 
         q_upper = query.upper()
         uid = st.session_state.get('user_id') or (params[0] if params else None)
         if uid and ("UPDATE USERS" in q_upper or "INSERT INTO HISTORY" in q_upper):
-            # Sync asynchrone sécurisée
             threading.Thread(target=sync_user_to_supabase, args=(uid,), daemon=True).start()
     return result
 
+@st.cache_data(ttl=3600)
 def pull_user_data_from_supabase(user_id):
     sb = DatabaseManager.get_supabase()
     if not sb: return False
@@ -111,16 +111,21 @@ def init_db():
                                      (q.get('category'), q.get('concept'), q.get('level'), q.get('question'), json.dumps(q.get('options')), q.get('correct'), q.get('explanation'), q.get('triad_id'), q.get('triad_position')))
     return True
 
+# --- LEADERBOARD & SYNC FUNCTIONS (Restauration) ---
+
+def sync_leaderboard_from_supabase(limit=20):
+    sb = DatabaseManager.get_supabase()
+    if not sb: return
+    try:
+        res = sb.table("users").select("user_id, name, level, total_score, city").order("level", desc=True).limit(limit).execute()
+        if res.data:
+            with DatabaseManager.session() as cursor:
+                for u in res.data:
+                    cursor.execute("INSERT OR REPLACE INTO users (user_id, name, level, total_score, city) VALUES (?, ?, ?, ?, ?)",
+                                 (u['user_id'], u['name'], u.get('level', 1), u.get('total_score', 0), u.get('city', '')))
+    except: pass
+
 def get_leaderboard(sync=False):
     if sync:
-        try:
-            sb = DatabaseManager.get_supabase()
-            if sb:
-                res = sb.table("users").select("user_id, name, level, total_score, city").order("level", desc=True).limit(15).execute()
-                if res.data:
-                    with DatabaseManager.session() as cursor:
-                        for u in res.data:
-                            cursor.execute("INSERT OR REPLACE INTO users (user_id, name, level, total_score, city) VALUES (?, ?, ?, ?, ?)",
-                                         (u['user_id'], u['name'], u.get('level', 1), u.get('total_score', 0), u.get('city', '')))
-        except: pass
+        threading.Thread(target=sync_leaderboard_from_supabase, daemon=True).start()
     return run_query('SELECT name, total_score, level FROM users ORDER BY level DESC, total_score DESC LIMIT 10', fetch_all=True)

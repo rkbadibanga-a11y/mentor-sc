@@ -111,29 +111,6 @@ def render_profile(uid: str):
 
     # 3. Badges
     st.markdown("---")
-    
-    # --- RESTAURATION FONCTION "SOIN" (SHOP) ---
-    with st.expander("❤️ Gestion du Stock de Vie (Boutique)", expanded=True):
-        c_shop1, c_shop2 = st.columns([0.7, 0.3])
-        current_hearts = st.session_state.get('hearts', 5)
-        current_xp = st.session_state.get('xp', 0)
-        
-        with c_shop1:
-            st.write(f"Vies actuelles : **{current_hearts}/5** | XP Disponible : **{current_xp}**")
-            st.caption("Investissez votre XP pour sécuriser votre continuité d'activité.")
-        
-        with c_shop2:
-            if current_hearts < 5:
-                if st.button("💊 +1 Vie (50 XP)", use_container_width=True, disabled=current_xp < 50):
-                    st.session_state.hearts += 1
-                    st.session_state.xp -= 50
-                    run_query('UPDATE users SET hearts=?, xp=? WHERE user_id=?', (st.session_state.hearts, st.session_state.xp, uid), commit=True)
-                    st.toast("Stock de sécurité renforcé !")
-                    time.sleep(0.5)
-                    st.rerun()
-            else:
-                st.success("Stock Maximum atteint !")
-
     st.markdown("### 🏅 Vos Badges Experts")
     earned_titles, icons = get_earned_badges_list(uid)
     

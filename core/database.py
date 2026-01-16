@@ -149,38 +149,34 @@ def pull_user_data_from_supabase(user_id):
         return False
 
 def sync_user_to_supabase(user_id):
-    """Envoie une copie des données utilisateur vers Supabase."""
+    """Envoie une copie complète des données utilisateur vers Supabase de manière robuste."""
     sb = DatabaseManager.get_supabase()
     if not sb: return
     
-    # On récupère les données locales fraîches
     local_data = run_query("SELECT * FROM users WHERE user_id=?", (user_id,), fetch_one=True)
     if not local_data: return
     
-    # Mapping des données pour Supabase
+    # Mapping complet pour Supabase
     data = {
-        "user_id": str(local_data[0]), 
-        "name": str(local_data[1]), 
-        "level": int(local_data[2] or 1),
-        "xp": int(local_data[3] or 0), 
-        "total_score": int(local_data[4] or 0), 
-        "mastery": int(local_data[5] or 0),
-        "q_count": int(local_data[6] or 0), 
-        "hearts": int(local_data[7] or 5), 
-        "email": str(local_data[9] or ""),
-        "city": str(local_data[10] or ""), 
-        "crisis_wins": int(local_data[13] or 0), 
-        "has_diploma": int(local_data[15] or 0)
+        "user_id": str(local_data[0]), "name": str(local_data[1]), 
+        "level": int(local_data[2] or 1), "xp": int(local_data[3] or 0), 
+        "total_score": int(local_data[4] or 0), "mastery": int(local_data[5] or 0),
+        "q_count": int(local_data[6] or 0), "hearts": int(local_data[7] or 5), 
+        "email": str(local_data[9] or ""), "city": str(local_data[10] or ""), 
+        "crisis_wins": int(local_data[13] or 0), "has_diploma": int(local_data[15] or 0),
+        "joker_5050": int(local_data[17] if len(local_data)>17 else 3),
+        "joker_hint": int(local_data[18] if len(local_data)>18 else 3),
+        "last_seen": str(local_data[8] or "")
     }
     
-    try:
-        # Upsert synchrone pour voir l'erreur
-        res = sb.table("users").upsert(data).execute()
-        st.toast("✅ Données sauvegardées sur le Cloud !")
-    except Exception as e:
-        st.error(f"❌ Erreur de sauvegarde Cloud : {e}")
-        # On log l'erreur pour analyse
-        print(f"Supabase Upsert Error: {e}")
+    def run_sync():
+        try:
+            sb.table("users").upsert(data).execute()
+        except Exception as e:
+            print(f"Supabase Background Sync Error: {e}")
+
+    import threading
+    threading.Thread(target=run_sync, daemon=True).start()
 
 def seed_questions():
     """Importe les questions depuis le fichier JSON si la base est vide."""

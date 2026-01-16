@@ -65,26 +65,20 @@ class QuizEngine:
         uid = st.session_state.user_id
         buffered = run_query("SELECT id, question_json FROM ai_queue WHERE user_id=? LIMIT 1", (uid,), fetch_one=True)
         
+        # On lance TOUJOURS le remplissage du buffer pour le futur
+        threading.Thread(target=self.prefetch_next_question, args=(uid,), daemon=True).start()
+
         if buffered:
             # Consommer le buffer
             run_query("DELETE FROM ai_queue WHERE id=?", (buffered[0],), commit=True)
-            # Lancer le remplissage du suivant en tâche de fond
-            threading.Thread(target=self.prefetch_next_question, args=(uid,), daemon=True).start()
             return json.loads(buffered[1])
 
-        # 2. Si buffer vide (ex: premier lancement), on génère en direct (le joueur attend un peu cette fois)
-        # Mais on lance quand même le prefetch pour le coup d'après
-        threading.Thread(target=self.prefetch_next_question, args=(uid,), daemon=True).start()
-        
-        # --- RÈGLE HYBRIDE 60/40 ---
-        use_ai = random.random() < 0.40
-        if use_ai:
-            q_ai = self.generate_ai_question()
-            if q_ai: return q_ai
-
+        # 2. Si buffer vide (Démarrage ou urgence) : PRIORITÉ VITESSE ABSOLUE
+        # On tape directement dans le stock local (0 latence)
         q_db = self.get_question_from_db(st.session_state.level)
         if q_db: return q_db
         
+        # 3. Dernier recours (si DB vide et buffer vide) : On est obligé d'attendre l'IA
         return self.generate_ai_question()
 
     def prefetch_next_question(self, uid):

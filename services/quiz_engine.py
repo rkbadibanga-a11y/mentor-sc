@@ -109,4 +109,9 @@ class QuizEngine:
             run_query('UPDATE users SET hearts=? WHERE user_id=?', (st.session_state.hearts, uid), commit=True)
             play_sfx("error")
 
+    def record_difficulty_vote(self, q_id, vote_type):
+        if not q_id: return
+        col = "hard_votes" if vote_type == "hard" else "easy_votes"
+        run_query(f"INSERT INTO difficulty_feedback (question_id, {col}) VALUES (?, 1) ON CONFLICT(question_id) DO UPDATE SET {col}={col}+1", (q_id,), commit=True)
+
 def get_quiz_engine(): return QuizEngine()

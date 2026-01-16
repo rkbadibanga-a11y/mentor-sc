@@ -154,6 +154,7 @@ class QuizEngine:
         st.session_state.mentor_message = random.choice(MENTOR_REACTIONS[st.session_state.result]['default'])
 
         if is_correct:
+            st.session_state.consecutive_wins = st.session_state.get('consecutive_wins', 0) + 1
             run_query('INSERT OR IGNORE INTO history (user_id, question_hash) VALUES (?, ?)', (uid, q_data['question']), commit=True)
             st.session_state.xp += 20; st.session_state.total_score += 20; st.session_state.q_count += 1
             
@@ -165,6 +166,7 @@ class QuizEngine:
             run_query('UPDATE users SET xp=?, total_score=?, q_count=?, level=? WHERE user_id=?', 
                      (st.session_state.xp, st.session_state.total_score, st.session_state.q_count, st.session_state.level, uid), commit=True)
         else:
+            st.session_state.consecutive_wins = 0 # Reset de la série
             st.session_state.hearts = max(0, st.session_state.hearts - 1)
             run_query('UPDATE users SET hearts=? WHERE user_id=?', (st.session_state.hearts, uid), commit=True)
             play_sfx("error")

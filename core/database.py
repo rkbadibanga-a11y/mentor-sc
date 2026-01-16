@@ -64,44 +64,21 @@ def run_query(query: str, params: tuple = (), fetch_one=False, fetch_all=False, 
         q_upper = query.upper()
         uid = st.session_state.get('user_id') or (params[0] if params else None)
         if uid:
-            # On lance la synchro dans un thread séparé pour ne pas bloquer l'UI
-            def sync_task():
-                try:
-                    if "UPDATE USERS" in q_upper:
-                        sync_user_to_supabase(uid)
-                    elif "HISTORY" in q_upper and "INSERT" in q_upper:
-                        sync_table_to_supabase("history", uid, {"user_id": uid, "question_hash": params[1] if len(params)>1 else ""})
-                    elif "STATS" in q_upper and ("INSERT" in q_upper or "UPDATE" in q_upper):
-                        # Récupérer la valeur à jour (interne au thread pour être sûr)
-                        with DatabaseManager.session() as thread_cursor:
-                            cat = params[1] if len(params)>1 else "Général"
-                            thread_cursor.execute("SELECT correct_count FROM stats WHERE user_id=? AND category=?", (uid, cat))
-                            st_res = thread_cursor.fetchone()
-                            if st_res:
-                                sync_table_to_supabase("stats", uid, {"user_id": uid, "category": cat, "correct_count": st_res[0]})
-                    elif "GLOSSARY" in q_upper and ("INSERT" in q_upper or "UPDATE" in q_upper):
-                        term = params[1] if "INSERT" in q_upper else (params[5] if len(params)>5 else params[0])
-                        with DatabaseManager.session() as thread_cursor:
-                            thread_cursor.execute("SELECT * FROM glossary WHERE user_id=? AND term=?", (uid, term))
-                            g_res = thread_cursor.fetchone()
-                            if g_res:
-                                sync_table_to_supabase("glossary", uid, {
-                                    "user_id": g_res[0], "term": g_res[1], "definition": g_res[2], 
-                                    "category": g_res[3], "use_case": g_res[4], "business_impact": g_res[5], "short_definition": g_res[6]
-                                })
-                    elif "NOTES" in q_upper and ("INSERT" in q_upper or "UPDATE" in q_upper):
-                        nid = params[1] if "INSERT" in q_upper else (params[2] if len(params)>2 else params[0])
-                        with DatabaseManager.session() as thread_cursor:
-                            thread_cursor.execute("SELECT * FROM notes WHERE user_id=? AND note_id=?", (uid, nid))
-                            n_res = thread_cursor.fetchone()
-                            if n_res:
-                                sync_table_to_supabase("notes", uid, {
-                                    "user_id": n_res[0], "note_id": n_res[1], "title": n_res[2], "content": n_res[3], "timestamp": n_res[4]
-                                })
-                except Exception as e:
-                    print(f"Async Sync Error: {e}")
-
-            threading.Thread(target=sync_task).start()
+            # DEBUG: On lance la synchro et on affiche les erreurs si elles existent
+            try:
+                if "UPDATE USERS" in q_upper:
+                    sync_user_to_supabase(uid)
+                elif "HISTORY" in q_upper and "INSERT" in q_upper:
+                    sync_table_to_supabase("history", uid, {"user_id": uid, "question_hash": params[1] if len(params)>1 else ""})
+                elif "STATS" in q_upper and ("INSERT" in q_upper or "UPDATE" in q_upper):
+                    with DatabaseManager.session() as thread_cursor:
+                        cat = params[1] if len(params)>1 else "Général"
+                        thread_cursor.execute("SELECT correct_count FROM stats WHERE user_id=? AND category=?", (uid, cat))
+                        st_res = thread_cursor.fetchone()
+                        if st_res:
+                            sync_table_to_supabase("stats", uid, {"user_id": uid, "category": cat, "correct_count": st_res[0]})
+            except Exception as e:
+                st.error(f"☁️ Erreur de synchronisation Cloud : {e}")
             
     return result
 

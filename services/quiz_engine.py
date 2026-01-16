@@ -29,14 +29,28 @@ class QuizEngine:
 
     def get_question_from_db(self, lvl):
         uid = st.session_state.user_id
-        # SQL RANDOM() : 100x plus rapide que charger toute la table
-        query = """
+        
+        # 1. Identifier le module en cours (Pédagogie)
+        current_module, _, _, _ = self.get_current_module_info(st.session_state.q_count)
+        
+        # 2. Chercher une question de ce module spécifique
+        query_module = """
             SELECT id, question, options, correct, explanation, theory, example, tip, category, concept 
             FROM question_bank 
-            WHERE level=? AND question NOT IN (SELECT question_hash FROM history WHERE user_id=?)
+            WHERE level=? AND category=? AND question NOT IN (SELECT question_hash FROM history WHERE user_id=?)
             ORDER BY RANDOM() LIMIT 1
         """
-        q_res = run_query(query, (lvl, uid), fetch_one=True)
+        q_res = run_query(query_module, (lvl, current_module, uid), fetch_one=True)
+        
+        # 3. Si aucune question du module, fallback sur le niveau global (Révision)
+        if not q_res:
+            query_global = """
+                SELECT id, question, options, correct, explanation, theory, example, tip, category, concept 
+                FROM question_bank 
+                WHERE level=? AND question NOT IN (SELECT question_hash FROM history WHERE user_id=?)
+                ORDER BY RANDOM() LIMIT 1
+            """
+            q_res = run_query(query_global, (lvl, uid), fetch_one=True)
         
         if q_res:
             return {

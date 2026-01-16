@@ -61,20 +61,74 @@ class QuizEngine:
         return None
 
     def manage_queue(self):
-        # --- RÈGLE HYBRIDE 60/40 ---
-        # On définit si on utilise l'IA (40%) ou la DB (60%) pour cette question
-        use_ai = random.random() < 0.40
+        # 1. Vérifier la file d'attente (Buffer Rapide)
+        uid = st.session_state.user_id
+        buffered = run_query("SELECT id, question_json FROM ai_queue WHERE user_id=? LIMIT 1", (uid,), fetch_one=True)
         
+        if buffered:
+            # Consommer le buffer
+            run_query("DELETE FROM ai_queue WHERE id=?", (buffered[0],), commit=True)
+            # Lancer le remplissage du suivant en tâche de fond
+            threading.Thread(target=self.prefetch_next_question, args=(uid,), daemon=True).start()
+            return json.loads(buffered[1])
+
+        # 2. Si buffer vide (ex: premier lancement), on génère en direct (le joueur attend un peu cette fois)
+        # Mais on lance quand même le prefetch pour le coup d'après
+        threading.Thread(target=self.prefetch_next_question, args=(uid,), daemon=True).start()
+        
+        # --- RÈGLE HYBRIDE 60/40 ---
+        use_ai = random.random() < 0.40
         if use_ai:
             q_ai = self.generate_ai_question()
             if q_ai: return q_ai
 
-        # Fallback ou choix 60% : On tente la DB
         q_db = self.get_question_from_db(st.session_state.level)
         if q_db: return q_db
         
-        # Si la DB est vide pour ce module, on force l'IA
         return self.generate_ai_question()
+
+    def prefetch_next_question(self, uid):
+        """Tâche de fond : Prépare la prochaine question dans ai_queue."""
+        # On vérifie si la file est déjà pleine (max 2 questions d'avance pour pas gâcher)
+        count = run_query("SELECT COUNT(*) FROM ai_queue WHERE user_id=?", (uid,), fetch_one=True)[0]
+        if count >= 2: return
+
+        # Logique de sélection (IA ou DB)
+        use_ai = random.random() < 0.40
+        q_data = None
+        
+        if not use_ai:
+            # On simule un niveau pour l'objet QuizEngine, ou on passe les params
+            # Ici on simplifie en réutilisant la logique existante mais adaptée au thread
+            # Attention : st.session_state n'est pas fiable dans un thread pur
+            # On va faire simple : DB par défaut, IA si vide
+            try:
+                # On doit recréer un contexte minimal ou faire une requête simple
+                # Pour éviter les soucis de thread, on fait une requête DB brute ici
+                query = "SELECT id, question, options, correct, explanation FROM question_bank ORDER BY RANDOM() LIMIT 1"
+                res = run_query(query, fetch_one=True)
+                if res:
+                    q_data = {
+                        "id": res[0], "question": res[1], "options": json.loads(res[2]),
+                        "correct": res[3], "explanation": res[4]
+                    }
+            except: pass
+        
+        if not q_data:
+            # On instancie un nouveau service IA car on est dans un thread
+            from services.ai_engine import get_ai_service
+            ai = get_ai_service()
+            # On génère une question générique de niveau moyen pour le buffer
+            prompt = "Génère 1 QCM Supply Chain expert. JSON: {'question':'...', 'options':{'A':'..'}, 'correct':'A', 'explanation':'...'}"
+            try:
+                raw, _ = ai.get_response(prompt)
+                if raw:
+                    raw = raw.replace("```json", "").replace("```", "").strip()
+                    q_data = json.loads(raw)
+            except: pass
+
+        if q_data:
+            run_query("INSERT INTO ai_queue (user_id, question_json) VALUES (?, ?)", (uid, json.dumps(q_data)), commit=True)
 
     def generate_ai_question(self):
         """Logique de génération IA isolée pour réutilisation."""

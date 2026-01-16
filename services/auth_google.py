@@ -10,7 +10,7 @@ import extra_streamlit_components as stx
 # Config
 CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-REDIRECT_URI = "https://mentor-sc.streamlit.app/"
+REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://mentorsc.streamlit.app/")
 
 def get_google_auth_url():
     flow = Flow.from_client_config(
@@ -74,13 +74,10 @@ def handle_google_callback():
                 'active_tab': 'mission'
             })
             
-            # Cookie persistant (30 jours)
-            from datetime import datetime, timedelta
-            expires = datetime.now() + timedelta(days=30)
-            cm = st.session_state.get('cookie_manager')
-            if cm:
-                cm.set('mentor_sc_uid', user_id, expires_at=expires)
+            # Persistance par URL (uid)
+            st.query_params["uid"] = user_id
             
-            # Clean URL
-            st.query_params.clear()
+            # Clean URL code
+            if "code" in st.query_params:
+                del st.query_params["code"]
             st.rerun()

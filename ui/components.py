@@ -51,10 +51,23 @@ def render_sidebar():
     ''', unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Stats Express
+    # --- STATS VISUELLES (RESTAURATION) ---
+    hearts = st.session_state.get('hearts', 5)
+    # Affichage des vies sous forme de cœurs
+    hearts_html = "❤️" * hearts + "🖤" * (5 - hearts)
+    
+    st.markdown(f"""
+        <div style="background: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 10px; border: 1px solid #334155; margin-bottom: 10px;">
+            <div style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">Stock de Sécurité (Vies)</div>
+            <div style="font-size: 1.5rem; letter-spacing: 2px;">{hearts_html}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
     c1, c2 = st.columns(2)
-    c1.metric("Niv", st.session_state.level)
-    c2.metric("XP", st.session_state.xp)
+    c1.metric("🎖️ Niveau", st.session_state.level)
+    c2.metric("✨ XP", st.session_state.xp)
+    
+    st.caption(f"Maîtrise : {st.session_state.get('mastery', 0)}%")
     st.progress(st.session_state.get('mastery', 0)/100)
     
     # Leaderboard (Local only for speed)

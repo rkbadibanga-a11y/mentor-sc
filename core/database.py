@@ -159,18 +159,28 @@ def sync_user_to_supabase(user_id):
     
     # Mapping des données pour Supabase
     data = {
-        "user_id": local_data[0], "name": local_data[1], "level": local_data[2],
-        "xp": local_data[3], "total_score": local_data[4], "mastery": local_data[5],
-        "q_count": local_data[6], "hearts": local_data[7], "email": local_data[9],
-        "city": local_data[10], "crisis_wins": local_data[13], "has_diploma": local_data[15],
-        "joker_5050": local_data[17], "joker_hint": local_data[18]
+        "user_id": str(local_data[0]), 
+        "name": str(local_data[1]), 
+        "level": int(local_data[2] or 1),
+        "xp": int(local_data[3] or 0), 
+        "total_score": int(local_data[4] or 0), 
+        "mastery": int(local_data[5] or 0),
+        "q_count": int(local_data[6] or 0), 
+        "hearts": int(local_data[7] or 5), 
+        "email": str(local_data[9] or ""),
+        "city": str(local_data[10] or ""), 
+        "crisis_wins": int(local_data[13] or 0), 
+        "has_diploma": int(local_data[15] or 0)
     }
     
     try:
-        # Upsert (Insert ou Update) sur Supabase
-        sb.table("users").upsert(data).execute()
+        # Upsert synchrone pour voir l'erreur
+        res = sb.table("users").upsert(data).execute()
+        st.toast("✅ Données sauvegardées sur le Cloud !")
     except Exception as e:
-        print(f"Supabase Sync Error: {e}")
+        st.error(f"❌ Erreur de sauvegarde Cloud : {e}")
+        # On log l'erreur pour analyse
+        print(f"Supabase Upsert Error: {e}")
 
 def seed_questions():
     """Importe les questions depuis le fichier JSON si la base est vide."""

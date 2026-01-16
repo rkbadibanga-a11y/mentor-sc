@@ -19,32 +19,37 @@ from ui.views.glossary import render_glossary
 from ui.views.tools import render_tools
 from ui.views.admin import render_admin_dashboard
 from utils.assets import trigger_queued_sounds
-from services.certificate_factory import show_diploma_celebration
 import extra_streamlit_components as stx
 
 def main():
     st.set_page_config(page_title="Mentor SC", page_icon="📦", layout="wide")
     apply_styles()
     
-    # 1. INITIALISATION CRITIQUE (Exhaustive)
-    if 'auth' not in st.session_state:
-        st.session_state.update({
-            'auth': False, 'user': '', 'user_id': '', 'level': 1, 'xp': 0, 'hearts': 5,
-            'q_count': 0, 'mastery': 0, 'total_score': 0, 'active_tab': 'mission',
-            'question_queue': [], 'chat_history': [], 'data': None,
-            'mentor_voice': True, 'crisis_active': False, 'answered': False
-        })
+    # 1. INITIALISATION ROBUSTE
+    defaults = {
+        'auth': False, 'user': '', 'user_id': '', 'level': 1, 'xp': 0, 'hearts': 5,
+        'q_count': 0, 'mastery': 0, 'total_score': 0, 'active_tab': 'mission',
+        'question_queue': [], 'chat_history': [], 'data': None,
+        'mentor_voice': True, 'crisis_active': False, 'answered': False,
+        'initialized': False
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+            
+    if not st.session_state.initialized:
         init_db()
+        st.session_state.initialized = True
 
+    # 2. COOKIE MANAGER
     if 'cookie_manager' not in st.session_state:
-        st.session_state.cookie_manager = stx.CookieManager(key="cookie_manager_v7")
+        st.session_state.cookie_manager = stx.CookieManager(key="cookie_v10")
     
-    # --- CALLBACK GOOGLE ---
+    # 3. CALLBACKS & AUTO-LOGIN
     if "code" in st.query_params:
         from services.auth_google import handle_google_callback
         handle_google_callback()
 
-    # --- AUTO LOGIN ---
     if not st.session_state.auth and not st.session_state.get('cookie_checked') and not st.session_state.get('logout_in_progress'):
         all_cookies = st.session_state.cookie_manager.get_all()
         if all_cookies:
@@ -63,6 +68,7 @@ def main():
                     st.rerun()
             st.session_state.cookie_checked = True
 
+    # 4. RENDU
     if not st.session_state.auth:
         render_login()
     else:
@@ -79,8 +85,8 @@ def main():
         if st.session_state.get('user_email') in os.getenv("ADMIN_EMAILS", ["r.k.badibanga@gmail.com"]):
             menu["admin"] = "👮 Admin"
 
-        selected = st.pills("Nav", options=list(menu.keys()), format_func=lambda x: menu[x], 
-                           default=st.session_state.active_tab, label_visibility="collapsed", key="nav_pills_final")
+        selected = st.pills("Navigation", options=list(menu.keys()), format_func=lambda x: menu[x], 
+                           default=st.session_state.active_tab, label_visibility="collapsed", key="pills_v20")
         
         if selected and selected != st.session_state.active_tab:
             st.session_state.active_tab = selected

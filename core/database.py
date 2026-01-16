@@ -27,7 +27,6 @@ class DatabaseManager:
     def session(cls):
         conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=30)
         conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
         cursor = conn.cursor()
         try:
             yield cursor
@@ -50,6 +49,7 @@ def run_query(query: str, params: tuple = (), fetch_one=False, fetch_all=False, 
         q_upper = query.upper()
         uid = st.session_state.get('user_id') or (params[0] if params else None)
         if uid and ("UPDATE USERS" in q_upper or "INSERT INTO HISTORY" in q_upper):
+            # Sync asynchrone sécurisée
             threading.Thread(target=sync_user_to_supabase, args=(uid,), daemon=True).start()
     return result
 
@@ -98,7 +98,7 @@ def init_db():
         cursor.execute('CREATE TABLE IF NOT EXISTS users (user_id TEXT PRIMARY KEY, name TEXT, level INTEGER DEFAULT 1, xp INTEGER DEFAULT 0, total_score INTEGER DEFAULT 0, mastery INTEGER DEFAULT 0, q_count INTEGER DEFAULT 0, hearts INTEGER DEFAULT 5, last_seen TEXT, email TEXT UNIQUE, city TEXT, referred_by TEXT, xp_checkpoint INTEGER DEFAULT 0, crisis_wins INTEGER DEFAULT 0, redemptions INTEGER DEFAULT 0, has_diploma INTEGER DEFAULT 0, current_run_xp INTEGER DEFAULT 0, joker_5050 INTEGER DEFAULT 3, joker_hint INTEGER DEFAULT 3)')
         cursor.execute('CREATE TABLE IF NOT EXISTS history (user_id TEXT, question_hash TEXT, UNIQUE(user_id, question_hash))')
         cursor.execute('CREATE TABLE IF NOT EXISTS stats (user_id TEXT, category TEXT, correct_count INTEGER, UNIQUE(user_id, category))')
-        cursor.execute('CREATE TABLE IF NOT EXISTS question_bank (id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT, concept TEXT, level INTEGER, question TEXT, options TEXT, correct TEXT, explanation TEXT, triad_id TEXT, triad_position INTEGER DEFAULT 0)')
+        cursor.execute('CREATE TABLE IF NOT EXISTS question_bank (id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT, concept TEXT, level INTEGER, question TEXT, options TEXT, correct TEXT, explanation TEXT, theory TEXT, example TEXT, tip TEXT, triad_id TEXT, triad_position INTEGER DEFAULT 0)')
         
         cursor.execute("SELECT COUNT(*) FROM question_bank")
         if cursor.fetchone()[0] == 0:

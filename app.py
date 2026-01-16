@@ -38,13 +38,13 @@ def main():
         from services.auth_google import handle_google_callback
         handle_google_callback()
     
-    # 1. Tentative de récupération du UID via Cookie (Seulement si non auth et pas encore checké)
-    if not st.session_state.get('auth') and not st.session_state.get('cookie_checked'):
+    # 1. Tentative de récupération du UID via Cookie (Seulement si non auth et pas en cours de déconnexion)
+    if not st.session_state.get('auth') and not st.session_state.get('cookie_checked') and not st.session_state.get('logout_in_progress'):
         all_cookies = st.session_state.cookie_manager.get_all()
         if all_cookies is not None: # CookieManager est prêt
             saved_uid = all_cookies.get('mentor_sc_uid')
             if saved_uid:
-                # Restaurer les données depuis le Cloud pour être sûr d'avoir l'historique et le classement
+                # Restaurer les données depuis le Cloud
                 from core.database import pull_user_data_from_supabase
                 pull_user_data_from_supabase(saved_uid)
                 
@@ -93,6 +93,10 @@ def main():
                 res = run_query('SELECT * FROM users WHERE user_id=?', (uid,), fetch_one=True)
 
         if res:
+            from datetime import datetime, timedelta
+            expires = datetime.now() + timedelta(days=30)
+            st.session_state.cookie_manager.set('mentor_sc_uid', uid, expires_at=expires)
+
             st.session_state.update({
                 'auth':True, 'user_id':res[0], 'user':res[1], 'user_email': res[9], 'user_city': res[10],
                 'level':int(res[2] or 1), 'xp':int(res[3] or 0), 'total_score':int(res[4] or 0),
@@ -110,6 +114,8 @@ def main():
                 'show_chaos_celebration': False, 'show_operator_celebration': False,
                 'pending_badge': None
             })
+            st.query_params.clear()
+            st.rerun()
 
     if 'auth' not in st.session_state:
         st.session_state.update({

@@ -214,17 +214,16 @@ def render_sidebar():
 
         st.markdown("---")
         if st.button(t('logout', lang), use_container_width=True):
+            # 1. Signaler la déconnexion pour bloquer le auto-login dans app.py
+            st.session_state.logout_in_progress = True
+            
+            # 2. Supprimer le cookie
             cm = st.session_state.get('cookie_manager')
             if cm: cm.delete('mentor_sc_uid')
             
-            # Suppression chirurgicale pour éviter la reconnexion auto immédiate
-            for key in list(st.session_state.keys()):
-                if key not in ['cookie_manager', 'lang', 'mentor_voice']:
-                    del st.session_state[key]
-            
+            # 3. Nettoyer la session en gardant le strict minimum pour le prochain tour
             st.session_state.auth = False
-            st.session_state.cookie_checked = True # Empêche le auto-login au prochain tour
-            st.query_params.clear() # Nettoyer l'URL
+            st.query_params.clear()
             st.rerun()            
         
         st.markdown("---")

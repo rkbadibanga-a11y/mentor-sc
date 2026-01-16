@@ -206,7 +206,15 @@ def render_mission():
     if st.session_state.get('active_joker_hint'): st.info(f"💡 Indice : {st.session_state.get('current_hint')}")
 
     # --- 6. OPTIONS ---
-    cols = st.columns(2); opts = q['options'].copy()
+    cols = st.columns(2)
+    # Sécurisation : on s'assure que options est un dictionnaire
+    opts_raw = q.get('options', {})
+    if isinstance(opts_raw, str):
+        try: opts = json.loads(opts_raw)
+        except: opts = {}
+    else:
+        opts = opts_raw.copy()
+
     if st.session_state.get('active_joker_5050'):
         wrong = [k for k in opts.keys() if k != q['correct']]
         for k in random.sample(wrong, 2): opts[k] = "---"

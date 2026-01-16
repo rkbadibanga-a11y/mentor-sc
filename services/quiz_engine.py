@@ -61,42 +61,43 @@ class QuizEngine:
         return None
 
     def manage_queue(self):
-        # 1. Tenter la DB
-        q = self.get_question_from_db(st.session_state.level)
-        if q: return q
+        # --- RÈGLE HYBRIDE 60/40 ---
+        # On définit si on utilise l'IA (40%) ou la DB (60%) pour cette question
+        use_ai = random.random() < 0.40
         
-        # 2. Si vide, on génère à la volée (Fallback IA)
+        if use_ai:
+            q_ai = self.generate_ai_question()
+            if q_ai: return q_ai
+
+        # Fallback ou choix 60% : On tente la DB
+        q_db = self.get_question_from_db(st.session_state.level)
+        if q_db: return q_db
+        
+        # Si la DB est vide pour ce module, on force l'IA
+        return self.generate_ai_question()
+
+    def generate_ai_question(self):
+        """Logique de génération IA isolée pour réutilisation."""
         mn, _, _, lvl = self.get_current_module_info(st.session_state.q_count)
-        prompt = f"Génère 1 QCM Supply Chain sur '{mn}' niveau {lvl}/4. JSON: {{'question':'...', 'options':{{'A':'..','B':'..','C':'..','D':'..'}}, 'correct':'A', 'explanation':'...', 'category':'{mn}'}}"
-        raw, _ = self.ai.get_response(prompt)
+        prompt = f"Génère 1 QCM Supply Chain expert sur '{mn}' niveau {lvl}/4. JSON: {{'question':'...', 'options':{{'A':'..','B':'..','C':'..','D':'..'}}, 'correct':'A', 'explanation':'...', 'category':'{mn}'}}"
         
-        if raw:
-            try:
+        try:
+            raw, _ = self.ai.get_response(prompt)
+            if raw:
                 # Nettoyage JSON
                 raw = raw.replace("```json", "").replace("```", "").strip()
                 q_data = json.loads(raw)
-                # Sauvegarde immédiate pour la prochaine fois
+                # Sauvegarde immédiate
                 run_query('INSERT INTO question_bank (category, level, question, options, correct, explanation) VALUES (?,?,?,?,?,?)',
                          (mn, lvl, q_data['question'], json.dumps(q_data['options']), q_data['correct'], q_data['explanation']), commit=True)
                 return {
-                    "id": None, # Pas d'ID encore
+                    "id": None,
                     "question": q_data['question'], "options": q_data['options'],
                     "correct": q_data['correct'], "explanation": q_data['explanation'],
                     "category": mn
                 }
-            except: pass
-            
-        # 3. ULTIMATE FAILSAFE (Si DB vide et IA HS)
-        # On renvoie une question statique pour débloquer l'utilisateur
-        return {
-            "id": None,
-            "question": "Question de secours : Quel est le flux qui remonte du client vers le fournisseur ?",
-            "options": {"A": "Flux Financier", "B": "Flux Physique", "C": "Flux d'Information", "D": "Flux Logistique Inverse (Reverse)"},
-            "correct": "D",
-            "explanation": "C'est la Logistique Inverse (Reverse Logistics), qui gère les retours, le SAV et le recyclage.",
-            "category": "Fondamentaux",
-            "concept": "Reverse Logistics"
-        }
+        except: pass
+        return None
 
     def validate_answer(self, choice, q_data):
         uid = st.session_state.user_id

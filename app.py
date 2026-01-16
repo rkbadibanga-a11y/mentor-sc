@@ -106,17 +106,23 @@ def main():
 
         trigger_queued_sounds()
         
+        # Navigation avec EMOJIS (Restaurés)
         menu = {
-            "mission": "🎯 Mission", "coach": "🧠 Audit", "process": "📚 MasterClass", 
-            "tools": "🛠️ Outils", "glossary": "📖 Glossaire", "notes": "📝 Notes", 
-            "profile": "📊 Profil", "leaderboard": "🏆 Top"
+            "mission": "🎯 Mission", 
+            "coach": "🧠 Audit", 
+            "process": "📚 MasterClass", 
+            "tools": "🛠️ Outils", 
+            "glossary": "📖 Glossaire", 
+            "notes": "📝 Notes", 
+            "profile": "📊 Profil", 
+            "leaderboard": "🏆 Top"
         }
         if st.session_state.get('user_email') in os.getenv("ADMIN_EMAILS", ["r.k.badibanga@gmail.com"]):
             menu["admin"] = "👮 Admin"
 
         selected = st.pills("Navigation", options=list(menu.keys()), format_func=lambda x: menu[x], 
                            default=st.session_state.get('active_tab', 'mission'), 
-                           label_visibility="collapsed", key="main_nav_pills_v4")
+                           label_visibility="collapsed", key="main_nav_pills_v5")
         
         if selected and selected != st.session_state.active_tab:
             st.session_state.active_tab = selected

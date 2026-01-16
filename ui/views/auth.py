@@ -98,7 +98,7 @@ def render_login():
                 res = run_query('SELECT user_id, name FROM users WHERE email=?', (email_magic,), fetch_one=True)
                 if res:
                     from services.email_service import send_email_notification
-                    magic_link = f"https://mentor-sc.streamlit.app/?uid={res[0]}"
+                    magic_link = f"https://mentorsc.streamlit.app/?uid={res[0]}"
                     subject = "📦 Votre Lien Magique Mentor SC"
                     body = f"Bonjour {res[1]},\n\nVoici votre accès direct à Mentor SC :\n{magic_link}\n\nEnregistrez ce lien dans vos favoris pour ne plus jamais perdre votre progression !"
                     

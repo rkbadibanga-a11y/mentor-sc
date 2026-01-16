@@ -5,7 +5,6 @@ from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 from google.oauth2 import id_token
 from core.database import run_query, pull_user_data_from_supabase
-import extra_streamlit_components as stx
 
 # Config
 CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")

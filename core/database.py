@@ -65,7 +65,7 @@ def run_query(query: str, params: tuple = (), fetch_one=False, fetch_all=False, 
                 if table:
                     threading.Thread(target=sync_generic_table, args=(table, uid, params, q_upper), daemon=True).start()
                     
-                    # --- NOUVEAU : ROULEMENT DES QUESTIONS (LIMIT 2000) ---
+                    # --- ROULEMENT DES QUESTIONS (LIMIT 2000) ---
                     if table == "question_bank":
                         enforce_question_limit(2000)
     return result
@@ -78,7 +78,6 @@ def enforce_question_limit(limit=2000):
             count = cursor.fetchone()[0]
             if count > limit:
                 to_delete = count - limit
-                # On supprime les plus petits IDs (les plus anciens)
                 cursor.execute(f"DELETE FROM question_bank WHERE id IN (SELECT id FROM question_bank ORDER BY id ASC LIMIT {to_delete})")
     except: pass
 
@@ -94,8 +93,6 @@ def sync_generic_table(table, uid, params, query_type):
             data = {"user_id": uid, "question_hash": q_hash}
             
         elif table == "question_bank":
-            # INSERT INTO question_bank (category, level, question, options, correct, explanation)
-            # params: (mn, lvl, q_data['question'], json.dumps(q_data['options']), q_data['correct'], q_data['explanation'])
             data = {
                 "category": params[0], "level": params[1], "question": params[2],
                 "options": params[3], "correct": params[4], "explanation": params[5]
@@ -119,7 +116,7 @@ def sync_generic_table(table, uid, params, query_type):
 def pull_shared_questions():
     """Récupère les questions générées par les autres joueurs sur le Cloud (Lazy Loading)."""
     import time
-    time.sleep(5) # Attente pour laisser le démarrage être instantané
+    time.sleep(5) 
     try:
         sb = DatabaseManager.get_supabase()
         if not sb: return
@@ -130,14 +127,6 @@ def pull_shared_questions():
                     cursor.execute("INSERT OR IGNORE INTO question_bank (category, level, question, options, correct, explanation) VALUES (?,?,?,?,?,?)",
                                  (q['category'], q['level'], q['question'], q['options'], q['correct'], q['explanation']))
     except: pass
-
-@st.cache_resource
-def init_db():
-    # Récupération des questions partagées en arrière-plan au démarrage
-    threading.Thread(target=pull_shared_questions, daemon=True).start()
-    
-    queries = [
-
 
 @st.cache_data(ttl=3600)
 def pull_user_data_from_supabase(user_id):
@@ -159,7 +148,7 @@ def pull_user_data_from_supabase(user_id):
                 u.get('has_diploma', 0), u.get('joker_5050', 3), u.get('joker_hint', 3)
             ), commit=False)
             
-            # 2. GLOSSARY (Restauration)
+            # 2. GLOSSARY
             res_g = sb.table("glossary").select("*").eq("user_id", user_id).execute()
             for g in res_g.data:
                 run_query("INSERT OR REPLACE INTO glossary (user_id, term, definition, category, use_case, business_impact, short_definition) VALUES (?,?,?,?,?,?,?)",
@@ -189,12 +178,14 @@ def sync_user_to_supabase(user_id):
 
 @st.cache_resource
 def init_db():
+    # Récupération des questions partagées en arrière-plan au démarrage
+    threading.Thread(target=pull_shared_questions, daemon=True).start()
+
     queries = [
         'CREATE TABLE IF NOT EXISTS users (user_id TEXT PRIMARY KEY, name TEXT, level INTEGER DEFAULT 1, xp INTEGER DEFAULT 0, total_score INTEGER DEFAULT 0, mastery INTEGER DEFAULT 0, q_count INTEGER DEFAULT 0, hearts INTEGER DEFAULT 5, last_seen TEXT, email TEXT UNIQUE, city TEXT, referred_by TEXT, xp_checkpoint INTEGER DEFAULT 0, crisis_wins INTEGER DEFAULT 0, redemptions INTEGER DEFAULT 0, has_diploma INTEGER DEFAULT 0, current_run_xp INTEGER DEFAULT 0, joker_5050 INTEGER DEFAULT 3, joker_hint INTEGER DEFAULT 3)',
         'CREATE TABLE IF NOT EXISTS history (user_id TEXT, question_hash TEXT, UNIQUE(user_id, question_hash))',
         'CREATE TABLE IF NOT EXISTS stats (user_id TEXT, category TEXT, correct_count INTEGER, UNIQUE(user_id, category))',
         'CREATE TABLE IF NOT EXISTS question_bank (id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT, concept TEXT, level INTEGER, question TEXT, options TEXT, correct TEXT, explanation TEXT, theory TEXT, example TEXT, tip TEXT, triad_id TEXT, triad_position INTEGER DEFAULT 0)',
-        # --- TABLES RESTAURÉES ---
         'CREATE TABLE IF NOT EXISTS glossary (user_id TEXT, term TEXT, definition TEXT, category TEXT, use_case TEXT, business_impact TEXT, short_definition TEXT, UNIQUE(user_id, term))',
         'CREATE TABLE IF NOT EXISTS notes (user_id TEXT, note_id TEXT PRIMARY KEY, title TEXT, content TEXT, timestamp TEXT)',
         'CREATE TABLE IF NOT EXISTS difficulty_feedback (question_id INTEGER, hard_votes INTEGER DEFAULT 0, easy_votes INTEGER DEFAULT 0, PRIMARY KEY(question_id))',
@@ -206,7 +197,7 @@ def init_db():
         for q in queries:
             cursor.execute(q)
         
-        # --- NOUVEAU : INDEXATION POUR VITESSE MAX ---
+        # INDEXATION
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_user ON history(user_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_qhash ON history(question_hash)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_composite ON history(user_id, question_hash)")
@@ -223,8 +214,6 @@ def init_db():
                         cursor.execute("INSERT INTO question_bank (category, concept, level, question, options, correct, explanation, triad_id, triad_position) VALUES (?,?,?,?,?,?,?,?,?)",
                                      (q.get('category'), q.get('concept'), q.get('level'), q.get('question'), json.dumps(q.get('options')), q.get('correct'), q.get('explanation'), q.get('triad_id'), q.get('triad_position')))
     return True
-
-# --- LEADERBOARD ---
 
 def sync_leaderboard_from_supabase(limit=20):
     sb = DatabaseManager.get_supabase()

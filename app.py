@@ -26,11 +26,13 @@ import extra_streamlit_components as stx
 def main():
     st.set_page_config(page_title="Mentor SC", page_icon="📦", layout="wide")
     
-    # Optimisation : Init une seule fois par session
-    if 'init_done' not in st.session_state:
-        apply_styles()
+    # CRITIQUE : Les styles doivent être appliqués à chaque rafraîchissement
+    apply_styles()
+    
+    # Init DB une seule fois par session serveur
+    if 'db_init' not in st.session_state:
         init_db()
-        st.session_state.init_done = True
+        st.session_state.db_init = True
 
     # --- GESTION DES COOKIES ---
     if 'cookie_manager' not in st.session_state:
@@ -41,7 +43,7 @@ def main():
         from services.auth_google import handle_google_callback
         handle_google_callback()
 
-    # 1. Auto-Login via Cookie (Optimisé)
+    # 1. Auto-Login via Cookie
     if not st.session_state.get('auth') and not st.session_state.get('cookie_checked') and not st.session_state.get('logout_in_progress'):
         all_cookies = st.session_state.cookie_manager.get_all()
         if all_cookies is not None:
@@ -58,7 +60,7 @@ def main():
                         'auth':True, 'user_id':res[0], 'user':res[1], 'user_email': res[9], 'user_city': res[10],
                         'level':int(res[2] or 1), 'xp':int(res[3] or 0), 'total_score':int(res[4] or 0),
                         'mastery':int(res[5] or 0), 'q_count':int(res[6] or 0), 'hearts':int(res[7] or 3),
-                        'active_tab': 'mission', 'cookie_checked': True
+                        'active_tab': 'mission', 'cookie_checked': True, 'data': None
                     })
                     st.rerun()
             st.session_state.cookie_checked = True
@@ -79,18 +81,17 @@ def main():
                 'auth':True, 'user_id':res[0], 'user':res[1], 'user_email': res[9], 'user_city': res[10],
                 'level':int(res[2] or 1), 'xp':int(res[3] or 0), 'total_score':int(res[4] or 0),
                 'mastery':int(res[5] or 0), 'q_count':int(res[6] or 0), 'hearts':int(res[7] or 3),
-                'active_tab': 'mission'
+                'active_tab': 'mission', 'data': None
             })
             st.query_params.clear()
             st.rerun()
 
+    # Initialisation des variables de session si non authentifié
     if 'auth' not in st.session_state:
         st.session_state.update({
             'auth': False, 'user': '', 'user_id': '', 'level': 1, 'xp': 0, 'hearts': 5,
-            'q_count': 0, 'mastery': 0, 'total_score': 0, 'active_tab': 'mission',
-            'question_queue': [], 'chat_history': [], 'data': None,
-            'mentor_message': '', 'last_result': None, 'mentor_voice': True,
-            'result': None, 'crisis_active': False, 'answered': False
+            'active_tab': 'mission', 'question_queue': [], 'chat_history': [], 'data': None,
+            'mentor_voice': True, 'crisis_active': False, 'answered': False, 'q_count': 0, 'mastery': 0, 'total_score': 0
         })
 
     if not st.session_state.auth:
@@ -115,7 +116,7 @@ def main():
 
         selected = st.pills("Navigation", options=list(menu.keys()), format_func=lambda x: menu[x], 
                            default=st.session_state.get('active_tab', 'mission'), 
-                           label_visibility="collapsed", key="main_nav_pills_v3")
+                           label_visibility="collapsed", key="main_nav_pills_v4")
         
         if selected and selected != st.session_state.active_tab:
             st.session_state.active_tab = selected

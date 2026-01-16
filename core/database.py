@@ -3,40 +3,35 @@ import sqlite3
 import os
 import json
 import streamlit as st
-from pathlib import Path
-from contextlib import contextmanager
-from core.config import DB_FILE, ROOT_DIR
-from supabase import create_client, Client
-
-import sqlite3
-import os
-import json
-import streamlit as st
 import threading
 from pathlib import Path
 from contextlib import contextmanager
 from core.config import DB_FILE, ROOT_DIR
 from supabase import create_client, Client
 
+@st.cache_resource
+def get_supabase_client():
+    """Initialise et met en cache le client Supabase."""
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_KEY")
+    if not url or not key:
+        return None
+    try:
+        return create_client(url, key)
+    except Exception as e:
+        print(f"Supabase Init Error: {e}")
+        return None
+
 class DatabaseManager:
     @staticmethod
     def get_supabase() -> Client:
-        """Initialise le client Supabase pour la persistance Cloud."""
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
-        if not url or not key:
-            return None
-        try:
-            return create_client(url, key)
-        except Exception as e:
-            st.error(f"❌ Erreur critique configuration Cloud : {e}")
-            return None
+        return get_supabase_client()
 
     @classmethod
     @contextmanager
     def session(cls):
         """Context manager pour assurer le commit/rollback automatique."""
-        conn = sqlite3.connect(DB_FILE)
+        conn = sqlite3.connect(DB_FILE, check_same_thread=False)
         cursor = conn.cursor()
         try:
             yield cursor
@@ -48,8 +43,7 @@ class DatabaseManager:
             conn.close()
 
 def run_query(query: str, params: tuple = (), fetch_one=False, fetch_all=False, commit=True):
-    """Exécute une requête SQL localement et synchronise avec le Cloud de manière asynchrone."""
-    # 1. Exécution Locale (Vitesse Maximale)
+    """Exécute une requête SQL localement."""
     result = None
     with DatabaseManager.session() as cursor:
         cursor.execute(query, params)
@@ -60,26 +54,12 @@ def run_query(query: str, params: tuple = (), fetch_one=False, fetch_all=False, 
         else:
             result = True
 
-    # 2. Synchronisation Cloud (VRAI Arrière-plan via Threading)
+    # Synchronisation Cloud en arrière-plan
     if commit:
         q_upper = query.upper()
         uid = st.session_state.get('user_id') or (params[0] if params else None)
-        if uid:
-            # DEBUG: On lance la synchro et on affiche les erreurs si elles existent
-            try:
-                if "UPDATE USERS" in q_upper:
-                    sync_user_to_supabase(uid)
-                elif "HISTORY" in q_upper and "INSERT" in q_upper:
-                    sync_table_to_supabase("history", uid, {"user_id": uid, "question_hash": params[1] if len(params)>1 else ""})
-                elif "STATS" in q_upper and ("INSERT" in q_upper or "UPDATE" in q_upper):
-                    with DatabaseManager.session() as thread_cursor:
-                        cat = params[1] if len(params)>1 else "Général"
-                        thread_cursor.execute("SELECT correct_count FROM stats WHERE user_id=? AND category=?", (uid, cat))
-                        st_res = thread_cursor.fetchone()
-                        if st_res:
-                            sync_table_to_supabase("stats", uid, {"user_id": uid, "category": cat, "correct_count": st_res[0]})
-            except Exception as e:
-                st.error(f"☁️ Erreur de synchronisation Cloud : {e}")
+        if uid and ("UPDATE USERS" in q_upper or "INSERT INTO HISTORY" in q_upper or "STATS" in q_upper):
+            threading.Thread(target=sync_user_to_supabase, args=(uid,), daemon=True).start()
             
     return result
 
@@ -109,11 +89,11 @@ def pull_user_data_from_supabase(user_id):
             """, (
                 u['user_id'], u['name'], u.get('level', 1), u.get('xp', 0), 
                 u.get('total_score', 0), u.get('mastery', 0), u.get('q_count', 0), 
-                u.get('hearts', 5), u['email'], u.get('city', ''), u.get('crisis_wins', 0),
+                u.get('hearts', 5), u.get('email'), u.get('city', ''), u.get('crisis_wins', 0),
                 u.get('has_diploma', 0), u.get('joker_5050', 3), u.get('joker_hint', 3)
             ), commit=False)
 
-        # 2. Table HISTORY (Crucial pour les questions répétées)
+        # 2. Table HISTORY
         res = sb.table("history").select("*").eq("user_id", user_id).execute()
         for h in res.data:
             run_query("INSERT OR IGNORE INTO history (user_id, question_hash) VALUES (?, ?)", 
@@ -125,38 +105,22 @@ def pull_user_data_from_supabase(user_id):
             run_query("INSERT OR REPLACE INTO stats (user_id, category, correct_count) VALUES (?, ?, ?)", 
                      (s['user_id'], s['category'], s['correct_count']), commit=False)
 
-        # 4. Table NOTES
-        res = sb.table("notes").select("*").eq("user_id", user_id).execute()
-        for n in res.data:
-            run_query("INSERT OR REPLACE INTO notes (user_id, note_id, title, content, timestamp) VALUES (?, ?, ?, ?, ?)", 
-                     (n['user_id'], n['note_id'], n['title'], n['content'], n['timestamp']), commit=False)
-
-        # 5. Table GLOSSARY
-        res = sb.table("glossary").select("*").eq("user_id", user_id).execute()
-        for g in res.data:
-            run_query("""
-                INSERT OR REPLACE INTO glossary 
-                (user_id, term, definition, category, use_case, business_impact, short_definition) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                g['user_id'], g['term'], g['definition'], g['category'], 
-                g.get('use_case'), g.get('business_impact'), g.get('short_definition')
-            ), commit=False)
-
         return True
     except Exception as e:
         print(f"Supabase Pull Error: {e}")
         return False
 
 def sync_user_to_supabase(user_id):
-    """Envoie une copie complète des données utilisateur vers Supabase de manière robuste."""
+    """Envoie une copie complète des données utilisateur vers Supabase."""
     sb = DatabaseManager.get_supabase()
     if not sb: return
     
-    local_data = run_query("SELECT * FROM users WHERE user_id=?", (user_id,), fetch_one=True)
+    with DatabaseManager.session() as cursor:
+        cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
+        local_data = cursor.fetchone()
+    
     if not local_data: return
     
-    # Mapping complet pour Supabase
     data = {
         "user_id": str(local_data[0]), "name": str(local_data[1]), 
         "level": int(local_data[2] or 1), "xp": int(local_data[3] or 0), 
@@ -169,45 +133,14 @@ def sync_user_to_supabase(user_id):
         "last_seen": str(local_data[8] or "")
     }
     
-    def run_sync():
-        try:
-            sb.table("users").upsert(data).execute()
-        except Exception as e:
-            print(f"Supabase Background Sync Error: {e}")
-
-    import threading
-    threading.Thread(target=run_sync, daemon=True).start()
-
-def seed_questions():
-    """Importe les questions depuis le fichier JSON si la base est vide."""
-    count = run_query("SELECT COUNT(*) FROM question_bank", fetch_one=True)[0]
-    if count > 0:
-        return # La base est déjà peuplée
-
-    seed_file = Path(ROOT_DIR) / "questions_seed.json"
-    if not seed_file.exists():
-        return # Pas de fichier seed disponible
-
     try:
-        with open(seed_file, "r", encoding="utf-8") as f:
-            questions = json.load(f)
-            for q in questions:
-                run_query("""
-                    INSERT INTO question_bank 
-                    (category, concept, level, question, options, correct, explanation, theory, example, tip, triad_id, triad_position) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    q.get('category'), q.get('concept'), q.get('level'), 
-                    q.get('question'), q.get('options'), q.get('correct'), 
-                    q.get('explanation'), q.get('theory'), q.get('example'), 
-                    q.get('tip'), q.get('triad_id'), q.get('triad_position')
-                ), commit=True)
-        st.success(f"🌱 {len(questions)} questions importées avec succès !")
+        sb.table("users").upsert(data).execute()
     except Exception as e:
-        st.error(f"Erreur lors de l'import des questions : {e}")
+        print(f"Supabase Sync Error: {e}")
 
+@st.cache_resource
 def init_db():
-    """Initialise les tables locales et tente de créer les tables Cloud."""
+    """Initialise les tables locales une seule fois."""
     queries = [
         'CREATE TABLE IF NOT EXISTS users (user_id TEXT PRIMARY KEY, name TEXT, level INTEGER DEFAULT 1, xp INTEGER DEFAULT 0, total_score INTEGER DEFAULT 0, mastery INTEGER DEFAULT 0, q_count INTEGER DEFAULT 0, hearts INTEGER DEFAULT 5, last_seen TEXT, email TEXT UNIQUE, city TEXT, referred_by TEXT, xp_checkpoint INTEGER DEFAULT 0, crisis_wins INTEGER DEFAULT 0, redemptions INTEGER DEFAULT 0, has_diploma INTEGER DEFAULT 0, current_run_xp INTEGER DEFAULT 0, joker_5050 INTEGER DEFAULT 3, joker_hint INTEGER DEFAULT 3)',
         'CREATE TABLE IF NOT EXISTS history (user_id TEXT, question_hash TEXT, UNIQUE(user_id, question_hash))',
@@ -217,74 +150,65 @@ def init_db():
         'CREATE TABLE IF NOT EXISTS ai_queue (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, question_json TEXT, category TEXT)',
         'CREATE TABLE IF NOT EXISTS question_bank (id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT, concept TEXT, level INTEGER, question TEXT, options TEXT, correct TEXT, explanation TEXT, theory TEXT, example TEXT, tip TEXT, triad_id TEXT, triad_position INTEGER DEFAULT 0)',
         'CREATE TABLE IF NOT EXISTS recent_failures (user_id TEXT, question_id INTEGER, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id, question_id))',
-        'CREATE TABLE IF NOT EXISTS difficulty_feedback (question_id INTEGER PRIMARY KEY, hard_votes INTEGER DEFAULT 0, easy_votes INTEGER DEFAULT 0)',
         'CREATE TABLE IF NOT EXISTS user_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, user_name TEXT, user_email TEXT, message TEXT, context TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)'
     ]
-    for q in queries:
-        run_query(q)
-    
-    # Migrations pour les JOKERS
-    try: run_query("ALTER TABLE users ADD COLUMN joker_5050 INTEGER DEFAULT 3")
-    except: pass
-    try: run_query("ALTER TABLE users ADD COLUMN joker_hint INTEGER DEFAULT 3")
-    except: pass
-    
-    # Index
-    run_query("CREATE INDEX IF NOT EXISTS idx_triad ON question_bank(triad_id, triad_position)")
+    with DatabaseManager.session() as cursor:
+        for q in queries:
+            cursor.execute(q)
     
     # Peuplement initial si nécessaire
     seed_questions()
+    return True
 
-    # Nettoyage automatique des termes parasites du glossaire et des vieux échecs (Performance)
-    run_query("DELETE FROM glossary WHERE definition LIKE '%Définition%' OR definition LIKE '%Déf%' OR definition LIKE '%?%' OR term = 'Terme' OR term = 'Objet';", commit=True)
-    run_query("DELETE FROM recent_failures WHERE timestamp < datetime('now', '-1 day')", commit=True)
+def seed_questions():
+    """Importe les questions depuis le fichier JSON."""
+    seed_file = Path(ROOT_DIR) / "questions_seed.json"
+    if not seed_file.exists(): return
+    
+    with DatabaseManager.session() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM question_bank")
+        if cursor.fetchone()[0] == 0:
+            try:
+                with open(seed_file, "r", encoding="utf-8") as f:
+                    questions = json.load(f)
+                    for q in questions:
+                        cursor.execute("""
+                            INSERT INTO question_bank 
+                            (category, concept, level, question, options, correct, explanation, triad_id, triad_position) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            q.get('category'), q.get('concept'), q.get('level'), 
+                            q.get('question'), json.dumps(q.get('options')), q.get('correct'), 
+                            q.get('explanation'), q.get('triad_id'), q.get('triad_position')
+                        ))
+            except Exception as e:
+                print(f"Seed Error: {e}")
+
+@st.cache_data(ttl=600)
+def get_leaderboard_local():
+    """Récupère le classement local mis en cache."""
+    return run_query('SELECT name, total_score, level FROM users ORDER BY level DESC, total_score DESC LIMIT 10', fetch_all=True)
 
 def sync_leaderboard_from_supabase(limit=100):
-    """Synchronise les meilleurs utilisateurs depuis Supabase vers la base locale."""
+    """Synchronise les meilleurs utilisateurs."""
     try:
         sb = DatabaseManager.get_supabase()
-        if not sb: return
-        
-        res = sb.table("users").select("user_id, name, level, xp, total_score, mastery, q_count, hearts, email, city, crisis_wins, has_diploma, last_seen").order("level", desc=True).order("total_score", desc=True).limit(limit).execute()
-        
+        if not sb: return False
+        res = sb.table("users").select("user_id, name, level, total_score, city, last_seen").order("level", desc=True).order("total_score", desc=True).limit(limit).execute()
         if res.data:
-            for u in res.data:
-                run_query("""
-                    INSERT OR REPLACE INTO users 
-                    (user_id, name, level, xp, total_score, mastery, q_count, hearts, email, city, crisis_wins, has_diploma, last_seen)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    u['user_id'], u['name'], u.get('level', 1), u.get('xp', 0), 
-                    u.get('total_score', 0), u.get('mastery', 0), u.get('q_count', 0), 
-                    u.get('hearts', 5), u.get('email'), u.get('city', ''), u.get('crisis_wins', 0),
-                    u.get('has_diploma', 0), u.get('last_seen')
-                ), commit=False)
-    except Exception as e:
-        print(f"Leaderboard Sync Error: {e}")
+            with DatabaseManager.session() as cursor:
+                for u in res.data:
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO users (user_id, name, level, total_score, city, last_seen)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (u['user_id'], u['name'], u.get('level', 1), u.get('total_score', 0), u.get('city', ''), u.get('last_seen')))
+            st.cache_data.clear() # Invalider le cache après synchro
+            return True
+    except: pass
+    return False
 
-def sync_all_users_for_admin():
-    """Synchronise l'intégralité des utilisateurs pour le dashboard admin."""
-    try:
-        sb = DatabaseManager.get_supabase()
-        if not sb: return
-        
-        res = sb.table("users").select("*").execute()
-        if res.data:
-            for u in res.data:
-                run_query("""
-                    INSERT OR REPLACE INTO users 
-                    (user_id, name, level, xp, total_score, mastery, q_count, hearts, email, city, crisis_wins, has_diploma, last_seen, joker_5050, joker_hint)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    u['user_id'], u['name'], u.get('level', 1), u.get('xp', 0), 
-                    u.get('total_score', 0), u.get('mastery', 0), u.get('q_count', 0), 
-                    u.get('hearts', 5), u.get('email'), u.get('city', ''), u.get('crisis_wins', 0),
-                    u.get('has_diploma', 0), u.get('last_seen'), u.get('joker_5050', 3), u.get('joker_hint', 3)
-                ), commit=False)
-    except Exception as e:
-        print(f"Admin Sync Error: {e}")
-
-def get_leaderboard():
-    """Récupère les meilleurs utilisateurs. Tente de synchroniser avec Supabase."""
-    sync_leaderboard_from_supabase(limit=10)
-    return run_query('SELECT name, total_score, level FROM users ORDER BY level DESC, total_score DESC LIMIT 10', fetch_all=True)
+def get_leaderboard(sync=False):
+    """Récupère le leaderboard. Synchro Cloud optionnelle."""
+    if sync:
+        sync_leaderboard_from_supabase(limit=10)
+    return get_leaderboard_local()

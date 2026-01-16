@@ -21,15 +21,18 @@ from ui.views.tools import render_tools
 from ui.views.admin import render_admin_dashboard
 from utils.assets import trigger_queued_sounds
 from services.certificate_factory import show_diploma_celebration
-import time 
 import extra_streamlit_components as stx
 
 def main():
     st.set_page_config(page_title="Mentor SC", page_icon="📦", layout="wide")
-    apply_styles()
-    init_db()
+    
+    # Optimisation : Init une seule fois par session
+    if 'init_done' not in st.session_state:
+        apply_styles()
+        init_db()
+        st.session_state.init_done = True
 
-    # --- GESTION DES COOKIES (MODERNE) ---
+    # --- GESTION DES COOKIES ---
     if 'cookie_manager' not in st.session_state:
         st.session_state.cookie_manager = stx.CookieManager(key="cookie_manager_main")
     
@@ -37,16 +40,17 @@ def main():
     if "code" in st.query_params:
         from services.auth_google import handle_google_callback
         handle_google_callback()
-    
-    # 1. Tentative de récupération du UID via Cookie (Seulement si non auth et pas en cours de déconnexion)
+
+    # 1. Auto-Login via Cookie (Optimisé)
     if not st.session_state.get('auth') and not st.session_state.get('cookie_checked') and not st.session_state.get('logout_in_progress'):
         all_cookies = st.session_state.cookie_manager.get_all()
-        if all_cookies is not None: # CookieManager est prêt
+        if all_cookies is not None:
             saved_uid = all_cookies.get('mentor_sc_uid')
             if saved_uid:
-                # Restaurer les données depuis le Cloud
-                from core.database import pull_user_data_from_supabase
-                pull_user_data_from_supabase(saved_uid)
+                if not st.session_state.get('cloud_synced'):
+                    from core.database import pull_user_data_from_supabase
+                    pull_user_data_from_supabase(saved_uid)
+                    st.session_state.cloud_synced = True
                 
                 res = run_query('SELECT * FROM users WHERE user_id=?', (saved_uid,), fetch_one=True)
                 if res:
@@ -54,39 +58,15 @@ def main():
                         'auth':True, 'user_id':res[0], 'user':res[1], 'user_email': res[9], 'user_city': res[10],
                         'level':int(res[2] or 1), 'xp':int(res[3] or 0), 'total_score':int(res[4] or 0),
                         'mastery':int(res[5] or 0), 'q_count':int(res[6] or 0), 'hearts':int(res[7] or 3),
-                        'active_tab': 'mission',
-                        'cookie_checked': True
+                        'active_tab': 'mission', 'cookie_checked': True
                     })
                     st.rerun()
             st.session_state.cookie_checked = True
 
-    # --- DÉTECTION ÉCHEC CRISE VIA URL (INFAILLIBLE) ---
-    if st.query_params.get("status") == "crisis_fail":
-        uid = st.session_state.get('user_id') or st.query_params.get('uid')
-        if uid:
-            # 1. Application de la sanction
-            st.session_state.hearts = max(0, st.session_state.get('hearts', 3) - 2)
-            st.session_state.crisis_active = False
-            st.session_state.answered = True
-            st.session_state.result = "LOSS"
-            st.session_state.last_result = "LOSS"
-            st.session_state.show_crisis_failure_dialog_trigger = True # Flag spécifique
-            
-            # 2. Synchronisation DB
-            run_query('UPDATE users SET hearts=? WHERE user_id=?', (st.session_state.hearts, uid), commit=True)
-            
-            # 3. Nettoyage URL
-            st.query_params.clear()
-            st.query_params["uid"] = uid
-            st.rerun()
-
     # --- PERSISTANCE DE SESSION (Auto-Login via URL) ---
     if not st.session_state.get('auth') and 'uid' in st.query_params:
         uid = st.query_params['uid']
-        # Tenter de récupérer localement
         res = run_query('SELECT * FROM users WHERE user_id=?', (uid,), fetch_one=True)
-        
-        # Si absent localement (ex: redémarrage serveur online), tenter un Pull depuis Supabase
         if not res:
             from core.database import pull_user_data_from_supabase
             if pull_user_data_from_supabase(uid):
@@ -94,25 +74,12 @@ def main():
 
         if res:
             from datetime import datetime, timedelta
-            expires = datetime.now() + timedelta(days=30)
-            st.session_state.cookie_manager.set('mentor_sc_uid', uid, expires_at=expires)
-
+            st.session_state.cookie_manager.set('mentor_sc_uid', uid, expires_at=datetime.now() + timedelta(days=30))
             st.session_state.update({
                 'auth':True, 'user_id':res[0], 'user':res[1], 'user_email': res[9], 'user_city': res[10],
                 'level':int(res[2] or 1), 'xp':int(res[3] or 0), 'total_score':int(res[4] or 0),
                 'mastery':int(res[5] or 0), 'q_count':int(res[6] or 0), 'hearts':int(res[7] or 3),
-                'xp_checkpoint':int(res[12] or 0), 'crisis_wins': int(res[13] or 0),
-                'redemptions': int(res[14] or 0), 'has_diploma': bool(res[15] or 0),
-                'current_run_xp': int(res[16] or 0),
-                'joker_5050': int(res[17] if len(res)>17 else 3), 
-                'joker_hint': int(res[18] if len(res)>18 else 3),
-                'data': None, 'question_queue': [], 'chat_history': [], 'consecutive_wins': 0,
-                'active_tab': 'mission', 'celebration_done': False, 'show_diploma': False,
-                'prefetched_data': None, 'current_engine': 'Base de données',
-                'crisis_dialog_shown': False, 'result': None, 'last_result': None,
-                'crisis_active': False, 'crisis_start_time': 0, 'answered': False,
-                'show_chaos_celebration': False, 'show_operator_celebration': False,
-                'pending_badge': None
+                'active_tab': 'mission'
             })
             st.query_params.clear()
             st.rerun()
@@ -123,67 +90,38 @@ def main():
             'q_count': 0, 'mastery': 0, 'total_score': 0, 'active_tab': 'mission',
             'question_queue': [], 'chat_history': [], 'data': None,
             'mentor_message': '', 'last_result': None, 'mentor_voice': True,
-            'result': None, # ICI
-            'crisis_active': False, 'answered': False,
-            'redemptions': 0, 'crisis_wins': 0, 'redemption_mode': False, 
-            'redemption_count': 0, 'consecutive_wins': 0, 'session_cleaned': False, 
-            'current_engine': 'Auto', 'has_diploma': False,
-            'show_diploma': False, 'refill_in_progress': False,
-            'celebration_done': False,
-            'joker_5050': 0, 'joker_hint': 0, 'active_joker_5050': False,
-            'prefetched_data': None,
-            'crisis_active': False, 'crisis_start_time': 0,
-            'crisis_dialog_shown': False,
-            'show_chaos_celebration': False,
-            'show_operator_celebration': False # ICI
+            'result': None, 'crisis_active': False, 'answered': False
         })
 
     if not st.session_state.auth:
         render_login()
     else:
-        # --- CÉLÉBRATION DIPLÔME (Écran prioritaire) ---
-        if st.session_state.show_diploma:
+        if st.session_state.get('show_diploma'):
             show_diploma_celebration()
             return
 
-        # 1. RENDU BARRE LATÉRALE (Stats & Paramètres)
         with st.sidebar:
             render_sidebar()
 
-        # 2. Événements de fond
         trigger_queued_sounds()
         
-        # 3. NAVIGATION HAUTE (Pills)
         menu = {
-            "mission": "🎯 Mission", 
-            "coach": "🧠 Audit", 
-            "process": "📚 MasterClass", 
-            "tools": "🛠️ Outils",
-            "glossary": "📖 Glossaire", 
-            "notes": "📝 Notes", 
-            "profile": "📊 Profil",
-            "leaderboard": "🏆 Top"
+            "mission": "🎯 Mission", "coach": "🧠 Audit", "process": "📚 MasterClass", 
+            "tools": "🛠️ Outils", "glossary": "📖 Glossaire", "notes": "📝 Notes", 
+            "profile": "📊 Profil", "leaderboard": "🏆 Top"
         }
-        
-        # Ajout Admin
-        if st.session_state.get('user_email') in os.getenv("ADMIN_EMAILS", ["r.k.badibanga@gmail.com", "mentor.sc.app@gmail.com"]):
+        if st.session_state.get('user_email') in os.getenv("ADMIN_EMAILS", ["r.k.badibanga@gmail.com"]):
             menu["admin"] = "👮 Admin"
 
-        selected = st.pills(
-            "Navigation", 
-            options=list(menu.keys()), 
-            format_func=lambda x: menu[x], 
-            default=st.session_state.get('active_tab', 'mission'), 
-            label_visibility="collapsed",
-            key="main_nav_pills_v2"
-        )
+        selected = st.pills("Navigation", options=list(menu.keys()), format_func=lambda x: menu[x], 
+                           default=st.session_state.get('active_tab', 'mission'), 
+                           label_visibility="collapsed", key="main_nav_pills_v3")
         
         if selected and selected != st.session_state.active_tab:
             st.session_state.active_tab = selected
             st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
-        uid = st.session_state.user_id
         tab = st.session_state.active_tab
         
         if tab == "mission": render_mission()
@@ -193,35 +131,12 @@ def main():
         elif tab == "leaderboard":
             from ui.views.leaderboard import render_leaderboard
             render_leaderboard()
-        elif tab == "notes": render_notes(uid)
-        elif tab == "profile": render_profile(uid)
-        elif tab == "glossary": render_glossary(uid)
+        elif tab == "notes": render_notes(st.session_state.user_id)
+        elif tab == "profile": render_profile(st.session_state.user_id)
+        elif tab == "glossary": render_glossary(st.session_state.user_id)
         elif tab == "admin": render_admin_dashboard()
 
-        # Le footer est géré ici globalement mais ne s'affiche que s'il y a un message
         render_mentor_footer()
-        
-        # --- AUTO-TRIGGER CÉLÉBRATION (Pour démo "Diplome") ---
-        # Si c'est l'user "Diplome" et qu'on n'a pas encore fait la fête...
-        if st.session_state.user == "Diplome" and not st.session_state.get('celebration_done'):
-            time.sleep(5) # Délai de 5 secondes (l'interface est visible mais figée)
-            st.session_state.show_diploma = True
-            st.session_state.celebration_done = True
-            st.session_state.has_diploma = True # On s'assure qu'il l'a
-            run_query("UPDATE users SET has_diploma=1 WHERE user_id=?", (st.session_state.user_id,), commit=True)
-            st.rerun()
-
-        # --- AUTO-TRIGGER BADGE (Pour démo "Badge") ---
-        if st.session_state.user == "Badge" and not st.session_state.get('operator_celebration_done'):
-            time.sleep(5)
-            # Force les données pour que le profil soit cohérent
-            st.session_state.q_count = 5
-            st.session_state.crisis_wins = 1
-            run_query("UPDATE users SET q_count=5, crisis_wins=1 WHERE user_id=?", (st.session_state.user_id,), commit=True)
-            
-            st.session_state.show_operator_celebration = True
-            st.session_state.operator_celebration_done = True
-            st.rerun()
 
 if __name__ == "__main__":
     main()

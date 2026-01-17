@@ -30,18 +30,6 @@ def render_login():
             email = st.text_input("📧 Email", placeholder="exemple@supply.com")
             submit_login = st.form_submit_button(t('login_btn', lang), type="primary", use_container_width=True)
             
-            # --- NOUVEAU : BOUTON GOOGLE ---
-            from services.auth_google import get_google_auth_url
-            google_url = get_google_auth_url()
-            st.markdown(f"""
-                <a href="{google_url}" target="_self" style="text-decoration: none;">
-                    <div style="display: flex; align-items: center; justify-content: center; background-color: white; color: #757575; border: 1px solid #dadce0; border-radius: 4px; padding: 10px; font-family: 'Roboto', arial, sans-serif; font-weight: 500; margin-top: 10px; cursor: pointer;">
-                        <img src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg" style="margin-right: 10px; width: 18px; height: 18px;">
-                        Se connecter avec Google
-                    </div>
-                </a>
-            """, unsafe_allow_html=True)
-            
             if submit_login:
                 if not email or "@" not in email:
                     st.warning("Veuillez entrer une adresse email valide.")

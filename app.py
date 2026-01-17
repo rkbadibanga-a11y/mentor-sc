@@ -35,11 +35,6 @@ def main():
         })
         init_db()
 
-    # --- CALLBACK GOOGLE ---
-    if "code" in st.query_params:
-        from services.auth_google import handle_google_callback
-        handle_google_callback()
-
     # --- AUTO LOGIN VIA URL ---
     if not st.session_state.auth and 'uid' in st.query_params:
         uid = st.query_params['uid']

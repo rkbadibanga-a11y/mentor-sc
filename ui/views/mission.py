@@ -235,7 +235,13 @@ def render_mission():
         def get_c(qd, ct):
             if qd.get(ct): return qd[ct]
             with st.spinner("IA..."):
-                ck = qd.get('correct', 'A'); ctx = qd.get('options', {}).get(ck, "")
+                ck = qd.get('correct', 'A')
+                opts_val = qd.get('options', {})
+                if isinstance(opts_val, str):
+                    try: opts_val = json.loads(opts_val)
+                    except: opts_val = {}
+                
+                ctx = opts_val.get(ck, "")
                 p_map = {"theory": "Fiche Réflexe 4-5 phrases.", "example": "Scénario 4-5 lignes.", "tip": "Règle d'Or."}
                 p = f"Q: {qd['question']} T: {p_map[ct]}"
                 res, en = get_ai_service().get_response(p); st.session_state.current_engine = en

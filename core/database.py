@@ -71,7 +71,26 @@ def run_query(query: str, params: tuple = (), fetch_one=False, fetch_all=False, 
                     threading.Thread(target=sync_generic_table, args=(table, uid, params, q_up), daemon=True).start()
                     if table == "question_bank":
                         enforce_question_limit(2000)
+            elif "DELETE" in q_up:
+                table = None
+                if "GLOSSARY" in q_up: table = "glossary"
+                elif "NOTES" in q_up: table = "notes"
+                if table:
+                    threading.Thread(target=delete_from_supabase, args=(table, uid, params), daemon=True).start()
     return result
+
+def delete_from_supabase(table, uid, params):
+    try:
+        sb = DatabaseManager.get_supabase()
+        if not sb: return
+        if table == "glossary" and params:
+            # Pour glossary, params[0] est le terme
+            sb.table(table).delete().eq("user_id", uid).eq("term", params[0]).execute()
+        elif table == "notes" and params:
+            # Pour notes, params[0] est le note_id
+            sb.table(table).delete().eq("note_id", params[0]).execute()
+    except:
+        pass
 
 def enforce_question_limit(limit=2000):
     try:

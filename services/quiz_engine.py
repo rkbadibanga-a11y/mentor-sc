@@ -156,6 +156,21 @@ class QuizEngine:
         if is_correct:
             st.session_state.consecutive_wins = st.session_state.get('consecutive_wins', 0) + 1
             run_query('INSERT OR IGNORE INTO history (user_id, question_hash) VALUES (?, ?)', (uid, q_data['question']), commit=True)
+            
+            # --- AUTO-POPULATE GLOSSARY ---
+            term = q_data.get('concept') or q_data.get('category') or "Concept SC"
+            definition = q_data.get('theory') or q_data.get('explanation') or ""
+            category = q_data.get('category') or "Général"
+            use_case = q_data.get('example') or ""
+            impact = q_data.get('tip') or ""
+            
+            if term and definition:
+                run_query("""
+                    INSERT OR REPLACE INTO glossary 
+                    (user_id, term, definition, category, use_case, business_impact, short_definition) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (uid, term, definition, category, use_case, impact, term), commit=True)
+
             st.session_state.xp += 20; st.session_state.total_score += 20; st.session_state.q_count += 1
             
             new_lvl = 1

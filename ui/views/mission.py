@@ -138,13 +138,34 @@ def render_mission():
     # --- 2. CHARGEMENT QUESTION ---
     if st.session_state.data is None:
         st.session_state.mentor_working = True
+        
+        # Init retry count
+        if 'mission_retry_count' not in st.session_state:
+            st.session_state.mission_retry_count = 0
+            
         with st.spinner("📦 Préparation..."):
-            try: st.session_state.data = engine.manage_queue()
-            except: st.session_state.data = None
-        st.session_state.answered = False
-        st.session_state.crisis_dialog_shown = False # Reset
-        st.session_state.show_crisis_failure_dialog_trigger = False # Reset le trigger
-        st.rerun() 
+            try: 
+                st.session_state.data = engine.manage_queue()
+            except: 
+                st.session_state.data = None
+        
+        if st.session_state.data is None:
+            st.session_state.mission_retry_count += 1
+            if st.session_state.mission_retry_count > 1:
+                st.error("Impossible de charger une mission. Le serveur IA est peut-être saturé.")
+                if st.button("🔄 Réessayer manuellement"):
+                    st.session_state.mission_retry_count = 0
+                    st.rerun()
+                return
+            else:
+                 st.rerun()
+        else:
+            # Reset count on success
+            st.session_state.mission_retry_count = 0
+            st.session_state.answered = False
+            st.session_state.crisis_dialog_shown = False # Reset
+            st.session_state.show_crisis_failure_dialog_trigger = False # Reset le trigger
+            st.rerun() 
     
     q = st.session_state.data
     if q is None: return

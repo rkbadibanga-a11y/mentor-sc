@@ -1,8 +1,5 @@
 # services/ai_engine.py
 import os
-import groq
-import google.generativeai as genai
-from mistralai import Mistral
 from typing import Optional, Tuple
 
 class AIService:
@@ -12,12 +9,13 @@ class AIService:
         key = os.getenv("GROQ_API_KEY")
         if not key: return None
         try:
+            import groq
             client = groq.Groq(api_key=key)
-            # Timeout augmenté pour permettre la génération de contenu structuré
+            # Timeout réduit pour éviter de bloquer l'UI trop longtemps
             res = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
-                timeout=10
+                timeout=5
             )
             return res.choices[0].message.content
         except Exception as e:
@@ -27,6 +25,7 @@ class AIService:
         key = os.getenv("MISTRAL_API_KEY")
         if not key: return None
         try:
+            from mistralai import Mistral
             client = Mistral(api_key=key)
             res = client.chat.complete(
                 model="mistral-large-latest", 
@@ -39,6 +38,11 @@ class AIService:
     def _try_gemini(self, prompt: str) -> Optional[str]:
         key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         if not key: return None
+        try:
+            import google.generativeai as genai
+        except ImportError:
+            return None
+
         # On tente plusieurs variantes de noms de modèles
         for model_name in ['gemini-1.5-flash', 'gemini-2.0-flash-exp', 'gemini-pro']:
             try:

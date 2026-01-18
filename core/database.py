@@ -123,7 +123,6 @@ def pull_shared_questions():
     except:
         pass
 
-@st.cache_data(ttl=3600)
 def pull_user_data_from_supabase(user_id):
     sb = DatabaseManager.get_supabase()
     if not sb: return False

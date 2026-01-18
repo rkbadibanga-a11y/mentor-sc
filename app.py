@@ -40,9 +40,10 @@ def main():
         uid = st.query_params['uid']
         res = run_query('SELECT * FROM users WHERE user_id=?', (uid,), fetch_one=True)
         if not res:
-            from core.database import pull_user_data_from_supabase
-            pull_user_data_from_supabase(uid)
-            res = run_query('SELECT * FROM users WHERE user_id=?', (uid,), fetch_one=True)
+            with st.spinner("Connexion au Cloud..."):
+                from core.database import pull_user_data_from_supabase
+                pull_user_data_from_supabase(uid)
+                res = run_query('SELECT * FROM users WHERE user_id=?', (uid,), fetch_one=True)
 
         if res:
             st.session_state.update({

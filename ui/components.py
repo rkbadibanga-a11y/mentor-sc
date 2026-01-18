@@ -108,7 +108,7 @@ def render_sidebar():
                     new google.translate.TranslateElement({pageLanguage: 'fr', includedLanguages: 'en,es,fr', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
                 }
             </script>
-            <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+            <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async></script>
         """, height=40)
         st.selectbox("🌐 Langue (Système)", ["Français", "English", "Español"], key='lang')
         st.toggle("🔊 Voix", key="mentor_voice")

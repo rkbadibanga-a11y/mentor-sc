@@ -240,7 +240,10 @@ def render_mission():
 
     if st.session_state.get('active_joker_5050'):
         wrong = [k for k in opts.keys() if k != q['correct']]
-        for k in random.sample(wrong, 2): opts[k] = "---"
+        # Sécurisation : on ne supprime que ce qu'on peut (max 2, ou moins si pas assez d'options)
+        nb_to_remove = min(2, len(wrong))
+        if nb_to_remove > 0:
+            for k in random.sample(wrong, nb_to_remove): opts[k] = "---"
     for i, (k, v) in enumerate(opts.items()):
         if cols[i%2].button(f"{k}) {v}", key=f"q_{k}", disabled=st.session_state.answered or v=="---", use_container_width=True):
             engine.validate_answer(k, q); st.session_state.active_joker_5050 = st.session_state.active_joker_hint = False

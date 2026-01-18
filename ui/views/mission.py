@@ -317,4 +317,34 @@ def render_mission():
         if cv2.button("✅ Trop facile", key=f"easy_{qh}", use_container_width=True):
             engine.record_difficulty_vote(q['id'], "easy")
             st.toast("Noté ! On va monter le niveau.", icon="📈")
+
+    # --- 8. KEYBOARD NAVIGATION ---
+    st.components.v1.html("""
+        <script>
+        const doc = window.parent.document;
+        doc.addEventListener('keydown', function(e) {
+            if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                const buttons = Array.from(doc.querySelectorAll('button:not([disabled])'));
+                const current = doc.activeElement;
+                let idx = buttons.indexOf(current);
+                
+                if (idx === -1) {
+                    // Si aucun focus, on prend le premier
+                    if(buttons.length > 0) buttons[0].focus();
+                    return;
+                }
+                
+                let nextIdx = idx;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    nextIdx = (idx + 1) % buttons.length;
+                } else {
+                    nextIdx = (idx - 1 + buttons.length) % buttons.length;
+                }
+                
+                buttons[nextIdx].focus();
+                e.preventDefault(); // Empêche le scroll natif
+            }
+        });
+        </script>
+    """, height=0)
             

@@ -212,9 +212,12 @@ def render_mission():
             jh = int(st.session_state.get('joker_hint') or 0)
             if cj2.button(f"📞 Indice ({jh})", key="jh", disabled=bool(jh <= 0 or st.session_state.get('active_joker_hint')), type="primary", use_container_width=True, help="Affiche un indice pour vous aider"):
                 st.session_state.joker_hint -= 1; st.session_state.active_joker_hint = True
-                with st.spinner("..."):
+                with st.spinner("Recherche d'un indice..."):
                     p = f"Indice court pour : {q['question']}"
                     hint, en = get_ai_service().get_response(p)
+                    # Fallback si l'IA échoue
+                    if not hint:
+                        hint = f"Concentrez-vous sur le concept clé : {q.get('concept', 'Logistique')}."
                     st.session_state.current_hint, st.session_state.current_engine = hint, en
                 run_query("UPDATE users SET joker_hint=joker_hint-1 WHERE user_id=?", (uid,), commit=True); st.rerun()
 

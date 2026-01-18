@@ -14,8 +14,8 @@ from services.ai_engine import get_ai_service
 @st.dialog("⌛ TEMPS ÉCOULÉ !")
 def show_crisis_failure_dialog():
     st.markdown("""
-        <div style='text-align: center;'>
-            <div style='font-size: 5rem; margin-bottom: 10px;'>💀</div>
+        <div style='text-align: center;' role="alert" aria-live="assertive">
+            <div style='font-size: 5rem; margin-bottom: 10px;' aria-hidden="true">💀</div>
             <h2 style='color: #ef4444;'>ÉCHEC CRITIQUE</h2>
             <p>La crise a paralysé vos opérations.<br>Le bilan est lourd : <b>-2 Stocks</b>.</p>
         </div>
@@ -35,7 +35,7 @@ def tts_button(text, label="🔊"):
     import json
     safe_text = json.dumps(text.replace("\n", " "))
     st.components.v1.html(f'''
-        <button id="tts-btn" style="background: linear-gradient(90deg, #007cf0, #00dfd8); color: white; border: none; padding: 5px 10px; border-radius: 15px; cursor: pointer; font-weight: bold;">{label}</button>
+        <button id="tts-btn" aria-label="Écouter la question" style="background: linear-gradient(90deg, #007cf0, #00dfd8); color: white; border: none; padding: 5px 10px; border-radius: 15px; cursor: pointer; font-weight: bold;">{label}</button>
         <script>
             var ttsBtn = document.getElementById('tts-btn');
             ttsBtn.onclick = function() {{
@@ -55,9 +55,9 @@ def show_badge_dialog(badge_data):
     desc = badge_data.get('desc', 'Félicitations !')
     
     st.markdown(f"""
-        <div style='text-align: center;'>
-            <div style='font-size: 5rem; margin-bottom: 10px;'>{emoji}</div>
-            <h3 style='color: #00dfd8;'>{title}</h3>
+        <div style='text-align: center;' role="dialog" aria-modal="true" aria-labelledby="badge-title">
+            <div style='font-size: 5rem; margin-bottom: 10px;' aria-hidden="true">{emoji}</div>
+            <h3 id="badge-title" style='color: #00dfd8;'>{title}</h3>
             <p>{desc}<br>Badge débloqué dans votre profil.</p>
         </div>
     """, unsafe_allow_html=True)
@@ -71,8 +71,8 @@ def show_badge_dialog(badge_data):
 
 def render_stock_out():
     st.markdown(f"""
-        <div style='text-align: center; background: rgba(239, 68, 68, 0.1); padding: 40px; border-radius: 20px; border: 2px solid #ef4444;'>
-            <div style='font-size: 6rem; margin-bottom: 20px;'>🚫</div>
+        <div style='text-align: center; background: rgba(239, 68, 68, 0.1); padding: 40px; border-radius: 20px; border: 2px solid #ef4444;' role="alert">
+            <div style='font-size: 6rem; margin-bottom: 20px;' aria-hidden="true">🚫</div>
             <h1 style='color: #ef4444;'>RUPTURE DE STOCK !</h1>
             <p style='font-size: 1.2rem;'>Vous n'avez plus de vies disponibles pour continuer la mission.</p>
             <p>La Supply Chain est à l'arrêt.</p>
@@ -83,7 +83,7 @@ def render_stock_out():
     
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("❤️ Réapprovisionner (100 XP)", use_container_width=True, type="primary"):
+        if st.button("❤️ Réapprovisionner (100 XP)", use_container_width=True, type="primary", help="Echange 100 XP contre 3 vies"):
             if st.session_state.xp >= 100:
                 st.session_state.xp -= 100
                 st.session_state.hearts = 3
@@ -96,7 +96,7 @@ def render_stock_out():
                 st.error("XP Insuffisante !")
     
     with c2:
-        if st.button("🙏 Demander une grâce au Mentor", use_container_width=True):
+        if st.button("🙏 Demander une grâce au Mentor", use_container_width=True, help="Obtenir une vie gratuitement (nombre limité)"):
             st.session_state.hearts = 1
             st.session_state.redemptions = st.session_state.get('redemptions', 0) + 1
             uid = st.session_state.user_id
@@ -176,7 +176,7 @@ def render_mission():
         fail_url = f"/?uid={uid}&status=crisis_fail"
 
         st.components.v1.html(f"""
-            <div id="timer-box" style="background: linear-gradient(90deg, #ef4444, #7f1d1d); color: white; text-align: center; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 22px; border: 2px solid white; font-family: sans-serif;">🚨 CHARGEMENT...</div>
+            <div id="timer-box" role="timer" aria-live="off" style="background: linear-gradient(90deg, #ef4444, #7f1d1d); color: white; text-align: center; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 22px; border: 2px solid white; font-family: sans-serif;">🚨 CHARGEMENT...</div>
             <script>
                 const target = {end_ts};
                 function update() {{
@@ -186,10 +186,12 @@ def render_mission():
                     const el = document.getElementById('timer-box');
                     if (sec <= 0) {{
                         el.innerHTML = "💀 TEMPS ÉCOULÉ !";
+                        el.setAttribute("aria-live", "assertive");
                         // INFAILLIBLE : Redirige toute la fenêtre parente
                         window.parent.location.href = "{fail_url}";
                     }} else {{
                         el.innerHTML = "🚨 CRISE : " + sec + "s 🚨";
+                        if(sec <= 5) el.setAttribute("aria-live", "polite"); // Annonce les 5 dernières secondes
                     }}
                 }}
                 setInterval(update, 1000); update();
@@ -204,11 +206,11 @@ def render_mission():
         if not st.session_state.answered:
             cj1, cj2 = st.columns(2)
             j5 = int(st.session_state.get('joker_5050') or 0)
-            if cj1.button(f"🔍 50/50 ({j5})", key="j50", disabled=bool(j5 <= 0 or st.session_state.get('active_joker_5050')), type="primary", use_container_width=True):
+            if cj1.button(f"🔍 50/50 ({j5})", key="j50", disabled=bool(j5 <= 0 or st.session_state.get('active_joker_5050')), type="primary", use_container_width=True, help="Supprime deux mauvaises réponses"):
                 st.session_state.joker_5050 -= 1; st.session_state.active_joker_5050 = True
                 run_query("UPDATE users SET joker_5050=joker_5050-1 WHERE user_id=?", (uid,), commit=True); st.rerun()
             jh = int(st.session_state.get('joker_hint') or 0)
-            if cj2.button(f"📞 Indice ({jh})", key="jh", disabled=bool(jh <= 0 or st.session_state.get('active_joker_hint')), type="primary", use_container_width=True):
+            if cj2.button(f"📞 Indice ({jh})", key="jh", disabled=bool(jh <= 0 or st.session_state.get('active_joker_hint')), type="primary", use_container_width=True, help="Affiche un indice pour vous aider"):
                 st.session_state.joker_hint -= 1; st.session_state.active_joker_hint = True
                 with st.spinner("..."):
                     p = f"Indice court pour : {q['question']}"
@@ -222,7 +224,7 @@ def render_mission():
     with c_q:
         box = "question-box fade-in"
         if st.session_state.get('answered') and st.session_state.get('result') == "LOSS": box = "question-box shake"
-        st.markdown(f'<div class="{box}">{q["question"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="{box}" role="heading" aria-level="2">{q["question"]}</div>', unsafe_allow_html=True)
     with c_s: tts_button(q["question"], "q_voice")
     if st.session_state.get('active_joker_hint'): st.info(f"💡 Indice : {st.session_state.get('current_hint')}")
 
@@ -250,8 +252,17 @@ def render_mission():
             if st.session_state.result == "WIN": st_lottie(LOTTIE_URLS['success'], height=150, key='win')
             else: st_lottie(LOTTIE_URLS['failed'], height=150, key='loss')
         except: pass
-        if st.session_state.result == "WIN": st.success(f"✅ CORRECT ! {q['explanation']}")
-        else: st.error(f"❌ ERREUR. Réponse : {q['correct']}. {q['explanation']}")
+        
+        feedback_class = "success" if st.session_state.result == "WIN" else "error"
+        feedback_icon = "✅" if st.session_state.result == "WIN" else "❌"
+        st.markdown(f"""
+            <div role="status" aria-live="polite" class="stAlert">
+                <div role="alert" data-baseweb="notification" class="{feedback_class}">
+                    {feedback_icon} {st.session_state.result == "WIN" and "CORRECT !" or "ERREUR."}
+                    <br>{q['explanation']}
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
             
         def get_c(qd, ct):
             if qd.get(ct): return qd[ct]

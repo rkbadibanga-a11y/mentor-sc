@@ -318,52 +318,58 @@ def render_mission():
             engine.record_difficulty_vote(q['id'], "easy")
             st.toast("Noté ! On va monter le niveau.", icon="📈")
 
-    # --- 8. KEYBOARD NAVIGATION & ENTER FIX ---
+    # --- 8. KEYBOARD NAVIGATION & ENTER FIX (SINGLETON) ---
     st.components.v1.html("""
         <script>
         try {
             const doc = window.parent.document;
-            doc.addEventListener('keydown', function(e) {
-                const isArrow = ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key);
-                const isEnter = e.key === 'Enter';
-                
-                if (isArrow || isEnter) {
-                    const buttons = Array.from(doc.querySelectorAll('button:not([disabled])'));
-                    const current = doc.activeElement;
+            
+            // Vérifie si le listener est déjà actif pour éviter l'accumulation
+            if (!doc.hasMentorSCNav) {
+                doc.addEventListener('keydown', function(e) {
+                    const isArrow = ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key);
+                    const isEnter = e.key === 'Enter';
                     
-                    // Si on est pas sur un bouton, on ignore ou on prend le premier
-                    if (!buttons.includes(current)) {
-                        if (isArrow && buttons.length > 0) {
-                            buttons[0].focus();
-                            e.preventDefault();
+                    if (isArrow || isEnter) {
+                        const buttons = Array.from(doc.querySelectorAll('button:not([disabled])'));
+                        const current = doc.activeElement;
+                        
+                        // Si on est pas sur un bouton, on ignore ou on prend le premier
+                        if (!buttons.includes(current)) {
+                            if (isArrow && buttons.length > 0) {
+                                buttons[0].focus();
+                                e.preventDefault();
+                            }
+                            return;
                         }
-                        return;
-                    }
-                    
-                    if (isEnter) {
-                        // Force le clic sur Entrée
-                        current.click();
+                        
+                        if (isEnter) {
+                            // Force le clic sur Entrée
+                            current.click();
+                            e.preventDefault();
+                            return;
+                        }
+                        
+                        // Navigation Flèches
+                        let idx = buttons.indexOf(current);
+                        let nextIdx = idx;
+                        
+                        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                            nextIdx = (idx + 1) % buttons.length;
+                        } else {
+                            nextIdx = (idx - 1 + buttons.length) % buttons.length;
+                        }
+                        
+                        buttons[nextIdx].focus();
                         e.preventDefault();
-                        return;
                     }
-                    
-                    // Navigation Flèches
-                    let idx = buttons.indexOf(current);
-                    let nextIdx = idx;
-                    
-                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                        nextIdx = (idx + 1) % buttons.length;
-                    } else {
-                        nextIdx = (idx - 1 + buttons.length) % buttons.length;
-                    }
-                    
-                    buttons[nextIdx].focus();
-                    e.preventDefault();
-                }
-            });
-            console.log("Keyboard nav loaded");
+                });
+                
+                doc.hasMentorSCNav = true;
+                console.log("Mentor SC: Keyboard navigation activated.");
+            }
         } catch(err) {
-            console.error("Keyboard nav failed:", err);
+            console.warn("Keyboard nav disabled (Cross-Origin):", err);
         }
         </script>
     """, height=0)

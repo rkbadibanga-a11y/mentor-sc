@@ -113,6 +113,14 @@ def render_sidebar():
         st.selectbox("🌐 Langue (Système)", ["Français", "English", "Español"], key='lang')
         st.toggle("🔊 Voix", key="mentor_voice")
         
+        # Bouton de secours pour les bugs d'interface
+        if st.button("🔄 Reset UI (Debug)", help="Si l'interface est bloquée ou les jokers disparus"):
+            st.session_state.answered = False
+            st.session_state.data = None # Force le rechargement d'une nouvelle question propre
+            st.session_state.active_joker_5050 = False
+            st.session_state.active_joker_hint = False
+            st.rerun()
+        
         if st.button("🚪 Déconnexion", use_container_width=True):
             st.session_state.clear()
             st.query_params.clear()

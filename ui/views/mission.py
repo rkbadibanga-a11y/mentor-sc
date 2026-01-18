@@ -318,33 +318,53 @@ def render_mission():
             engine.record_difficulty_vote(q['id'], "easy")
             st.toast("Noté ! On va monter le niveau.", icon="📈")
 
-    # --- 8. KEYBOARD NAVIGATION ---
+    # --- 8. KEYBOARD NAVIGATION & ENTER FIX ---
     st.components.v1.html("""
         <script>
-        const doc = window.parent.document;
-        doc.addEventListener('keydown', function(e) {
-            if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-                const buttons = Array.from(doc.querySelectorAll('button:not([disabled])'));
-                const current = doc.activeElement;
-                let idx = buttons.indexOf(current);
+        try {
+            const doc = window.parent.document;
+            doc.addEventListener('keydown', function(e) {
+                const isArrow = ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key);
+                const isEnter = e.key === 'Enter';
                 
-                if (idx === -1) {
-                    // Si aucun focus, on prend le premier
-                    if(buttons.length > 0) buttons[0].focus();
-                    return;
+                if (isArrow || isEnter) {
+                    const buttons = Array.from(doc.querySelectorAll('button:not([disabled])'));
+                    const current = doc.activeElement;
+                    
+                    // Si on est pas sur un bouton, on ignore ou on prend le premier
+                    if (!buttons.includes(current)) {
+                        if (isArrow && buttons.length > 0) {
+                            buttons[0].focus();
+                            e.preventDefault();
+                        }
+                        return;
+                    }
+                    
+                    if (isEnter) {
+                        // Force le clic sur Entrée
+                        current.click();
+                        e.preventDefault();
+                        return;
+                    }
+                    
+                    // Navigation Flèches
+                    let idx = buttons.indexOf(current);
+                    let nextIdx = idx;
+                    
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                        nextIdx = (idx + 1) % buttons.length;
+                    } else {
+                        nextIdx = (idx - 1 + buttons.length) % buttons.length;
+                    }
+                    
+                    buttons[nextIdx].focus();
+                    e.preventDefault();
                 }
-                
-                let nextIdx = idx;
-                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-                    nextIdx = (idx + 1) % buttons.length;
-                } else {
-                    nextIdx = (idx - 1 + buttons.length) % buttons.length;
-                }
-                
-                buttons[nextIdx].focus();
-                e.preventDefault(); // Empêche le scroll natif
-            }
-        });
+            });
+            console.log("Keyboard nav loaded");
+        } catch(err) {
+            console.error("Keyboard nav failed:", err);
+        }
         </script>
     """, height=0)
             

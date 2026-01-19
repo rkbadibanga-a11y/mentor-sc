@@ -7,50 +7,12 @@ from core.database import run_query
 from services.ai_engine import get_ai_service
 from services.certificate_factory import generate_certificate_pdf, get_base64_image, get_certificate_html
 from core.config import t, ADMIN_EMAILS
+from core.badges import calculate_badges, get_badge_groups
 
 def get_earned_badges_list(uid):
-    """Calcule la liste des badges acquis selon les critères actuels."""
-    qc = st.session_state.q_count
-    lvl = st.session_state.level
-    wins = st.session_state.get('consecutive_wins', 0)
-    cw = st.session_state.get('crisis_wins', 0)
-    rd = st.session_state.get('redemptions', 0)
-    
-    # Stats par catégorie
-    d = dict(run_query('SELECT category, correct_count FROM stats WHERE user_id = ?', (uid,), fetch_all=True))
-    
-    # Nombre de termes dans le glossaire
-    glossary_count_res = run_query('SELECT COUNT(*) FROM glossary WHERE user_id = ?', (uid,), fetch_one=True)
-    glossary_count = glossary_count_res[0] if glossary_count_res else 0
-    
-    # Heure actuelle pour "Oiseau de Nuit"
-    current_hour = datetime.datetime.now().hour
-    is_night_owl = current_hour >= 22 or current_hour <= 6
-
-    # Définition des badges et critères
-    badges_criteria = [
-        ("🔰", "Opérateur SC", qc >= 5),
-        ("📦", "Resp. Exploitation", qc >= 120),
-        ("🚚", "Coordinateur Flux", lvl >= 2),
-        ("📊", "Planificateur Confirmé", qc >= 250),
-        ("⚙️", "Ingénieur SC", lvl >= 3),
-        ("🔮", "Data Strategist SC", qc >= 380),
-        ("🏭", "COO (Directeur Ops)", lvl >= 4),
-        ("👑", "Visionnaire SC", qc >= 500),
-        ("💸", "Le Négociateur", d.get('Achats', 0) >= 10),
-        ("🧊", "Gardien du Stock", d.get('Stocks', 0) >= 20),
-        ("🚢", "Globe-Trotter", d.get('Transport', 0) >= 15),
-        ("🤖", "Oracle Digital", d.get('IA & Data', 0) >= 15),
-        ("🥋", "Sensei Lean", d.get('Stratégie Lean', 0) >= 15),
-        ("🔥", "Maître du Chaos", cw >= 1),
-        ("🔥", "On Fire", wins >= 10),
-        ("🧟", "Le Survivant", rd >= 1),
-        ("📚", "L'Encyclopédie", glossary_count >= 50),
-        ("🦉", "Oiseau de Nuit", is_night_owl)
-    ]
-    
-    earned = [title for (emoji, title, condition) in badges_criteria if condition]
-    icons = {title: emoji for (emoji, title, condition) in badges_criteria}
+    """Calcule la liste des badges acquis via le service centralisé."""
+    earned, metadata = calculate_badges(uid)
+    icons = {title: data['emoji'] for title, data in metadata.items()}
     return earned, icons
 
 def render_profile(uid: str):
@@ -114,23 +76,7 @@ def render_profile(uid: str):
     st.markdown("### 🏅 Vos Badges Experts")
     earned_titles, icons = get_earned_badges_list(uid)
     
-    groups = [
-        ("📈 Rangs de Carrière", [
-            ("🔰", "Opérateur SC", "5 questions"), ("📦", "Resp. Exploitation", "Niv 1"),
-            ("🚚", "Coordinateur Flux", "Niv 2 atteint"), ("📊", "Planificateur Confirmé", "Niv 2 fini"),
-            ("⚙️", "Ingénieur SC", "Niv 3 atteint"), ("🔮", "Data Strategist SC", "Niv 3 fini"),
-            ("🏭", "COO (Directeur Ops)", "Niv 4 atteint"), ("👑", "Visionnaire SC", "Titre Ultime")
-        ]),
-        ("🎯 Spécialisations", [
-            ("💸", "Le Négociateur", "10 Achats"), ("🧊", "Gardien du Stock", "20 Stocks"),
-            ("🚢", "Globe-Trotter", "Expert Transport"), ("🤖", "Oracle Digital", "Maître IA"),
-            ("🥋", "Sensei Lean", "Expert Lean"), ("🔥", "Maître du Chaos", "1ère Crise maîtrisée")
-        ]),
-        ("🎮 Gameplay", [
-            ("🔥", "On Fire", "10 victoires"), ("🧟", "Le Survivant", "1 Rédemption"),
-            ("📚", "L'Encyclopédie", "50 termes"), ("🦉", "Oiseau de Nuit", "Session nocturne")
-        ])
-    ]
+    groups = get_badge_groups()
     
     for section_title, badge_list in groups:
         st.markdown(f"#### {section_title}")

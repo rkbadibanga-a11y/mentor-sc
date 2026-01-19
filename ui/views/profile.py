@@ -18,21 +18,8 @@ def get_earned_badges_list(uid):
 def render_profile(uid: str):
     st.markdown("### 📊 Analyse des Compétences")
     
-    # 1. Coaching IA
+    # 1. Stats Data Retrieval
     stats_dict = dict(run_query('SELECT category, correct_count FROM stats WHERE user_id = ?', (uid,), fetch_all=True))
-    
-    if stats_dict:
-        if 'daily_coaching' not in st.session_state:
-            prompt = f"Rédige un diagnostic de carrière court (3 phrases) pour {st.session_state.user} basé sur ces stats: {json.dumps(stats_dict)}. Ton pro et visionnaire."
-            res, _ = get_ai_service().get_response(prompt, preferred="mistral")
-            st.session_state.daily_coaching = res
-        
-        st.markdown(f"""
-            <div style='background: rgba(0, 124, 240, 0.05); border-left: 4px solid #007cf0; padding: 20px; border-radius: 10px; margin-bottom: 25px;'>
-                <h4 style='color: #007cf0; margin-top: 0;'>🧠 Diagnostic du Mentor SC</h4>
-                <p style='font-style: italic; color: #f1f5f9; line-height: 1.5;'>"{st.session_state.daily_coaching}"</p>
-            </div>
-        """, unsafe_allow_html=True)
 
     # 2. Radar
     # Mapping modules to core categories for the radar

@@ -9,71 +9,13 @@ from services.ai_engine import get_ai_service
 from core.database import run_query, DatabaseManager
 from core.config import CURRICULUM, MENTOR_REACTIONS, LEVEL_THRESHOLDS
 from utils.assets import play_sfx
-
 from core.badges import check_new_badge
 
 class QuizEngine:
     def __init__(self):
         self.ai = get_ai_service()
-# ... (rest of the file until validate_answer)
 
-    def validate_answer(self, choice, q_data):
-        uid = st.session_state.user_id
-        is_correct = (str(choice).strip().upper() == str(q_data['correct']).strip().upper())
-        
-        st.session_state.answered = True
-        st.session_state.result = "WIN" if is_correct else "LOSS"
-        st.session_state.last_result = st.session_state.result
-        st.session_state.mentor_message = random.choice(MENTOR_REACTIONS[st.session_state.result]['default'])
-
-        if is_correct:
-            st.session_state.consecutive_wins = st.session_state.get('consecutive_wins', 0) + 1
-            run_query('INSERT OR IGNORE INTO history (user_id, question_hash) VALUES (?, ?)', (uid, q_data['question']), commit=True)
-            
-            # --- UPDATE CATEGORY STATS (FIX BADGES) ---
-            cat = q_data.get('category', 'Général')
-            run_query('INSERT INTO stats (user_id, category, correct_count) VALUES (?, ?, 1) ON CONFLICT(user_id, category) DO UPDATE SET correct_count=correct_count+1', (uid, cat), commit=True)
-
-            # --- AUTO-POPULATE GLOSSARY ---
-            term = q_data.get('concept') or q_data.get('category') or "Concept SC"
-            definition = q_data.get('theory') or q_data.get('explanation') or ""
-            category = q_data.get('category') or "Général"
-            use_case = q_data.get('example') or ""
-            impact = q_data.get('tip') or ""
-            
-            if term and definition:
-                run_query("""
-                    INSERT OR REPLACE INTO glossary 
-                    (user_id, term, definition, category, use_case, business_impact, short_definition) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (uid, term, definition, category, use_case, impact, term), commit=True)
-
-            st.session_state.xp += 20; st.session_state.total_score += 20; st.session_state.q_count += 1
-            
-            new_lvl = 1
-            for l, thresh in sorted(LEVEL_THRESHOLDS.items(), reverse=True):
-                if st.session_state.q_count >= thresh: new_lvl = l; break
-            
-            # Level Up Sound
-            if new_lvl > st.session_state.level:
-                play_sfx("levelup")
-            
-            st.session_state.level = new_lvl
-            
-            run_query('UPDATE users SET xp=?, total_score=?, q_count=?, level=? WHERE user_id=?', 
-                     (st.session_state.xp, st.session_state.total_score, st.session_state.q_count, st.session_state.level, uid), commit=True)
-            
-            # --- CHECK BADGES ---
-            new_badge = check_new_badge(uid)
-            if new_badge:
-                st.session_state.pending_badge = new_badge
-                play_sfx("trophy")
-                
-        else:
-            st.session_state.consecutive_wins = 0 # Reset de la série
-            st.session_state.hearts = max(0, st.session_state.hearts - 1)
-            run_query('UPDATE users SET hearts=? WHERE user_id=?', (st.session_state.hearts, uid), commit=True)
-            play_sfx("error")
+    def get_current_module_info(self, qc: int):
         lvl = 1
         for l, thresh in sorted(LEVEL_THRESHOLDS.items(), reverse=True):
             if qc >= thresh: lvl = l; break
@@ -148,13 +90,7 @@ class QuizEngine:
         q_data = None
         
         if not use_ai:
-            # On simule un niveau pour l'objet QuizEngine, ou on passe les params
-            # Ici on simplifie en réutilisant la logique existante mais adaptée au thread
-            # Attention : st.session_state n'est pas fiable dans un thread pur
-            # On va faire simple : DB par défaut, IA si vide
             try:
-                # On doit recréer un contexte minimal ou faire une requête simple
-                # Pour éviter les soucis de thread, on fait une requête DB brute ici
                 query = "SELECT id, question, options, correct, explanation FROM question_bank ORDER BY RANDOM() LIMIT 1"
                 res = run_query(query, fetch_one=True)
                 if res:
@@ -165,10 +101,8 @@ class QuizEngine:
             except: pass
         
         if not q_data:
-            # On instancie un nouveau service IA car on est dans un thread
             from services.ai_engine import get_ai_service
             ai = get_ai_service()
-            # On génère une question générique de niveau moyen pour le buffer
             prompt = "Génère 1 QCM Supply Chain expert. JSON: {'question':'...', 'options':{'A':'..'}, 'correct':'A', 'explanation':'...'}"
             try:
                 raw, _ = ai.get_response(prompt)
@@ -181,17 +115,14 @@ class QuizEngine:
             run_query("INSERT INTO ai_queue (user_id, question_json) VALUES (?, ?)", (uid, json.dumps(q_data)), commit=True)
 
     def generate_ai_question(self):
-        """Logique de génération IA isolée pour réutilisation."""
         mn, _, _, lvl = self.get_current_module_info(st.session_state.q_count)
         prompt = f"Génère 1 QCM Supply Chain expert sur '{mn}' niveau {lvl}/4. JSON: {{'question':'...', 'options':{{'A':'..','B':'..','C':'..','D':'..'}}, 'correct':'A', 'explanation':'...', 'category':'{mn}'}}"
         
         try:
             raw, _ = self.ai.get_response(prompt)
             if raw:
-                # Nettoyage JSON
                 raw = raw.replace("```json", "").replace("```", "").strip()
                 q_data = json.loads(raw)
-                # Sauvegarde immédiate
                 run_query('INSERT INTO question_bank (category, level, question, options, correct, explanation) VALUES (?,?,?,?,?,?)',
                          (mn, lvl, q_data['question'], json.dumps(q_data['options']), q_data['correct'], q_data['explanation']), commit=True)
                 return {
@@ -216,7 +147,7 @@ class QuizEngine:
             st.session_state.consecutive_wins = st.session_state.get('consecutive_wins', 0) + 1
             run_query('INSERT OR IGNORE INTO history (user_id, question_hash) VALUES (?, ?)', (uid, q_data['question']), commit=True)
             
-            # --- UPDATE CATEGORY STATS (FIX BADGES) ---
+            # --- UPDATE CATEGORY STATS ---
             cat = q_data.get('category', 'Général')
             run_query('INSERT INTO stats (user_id, category, correct_count) VALUES (?, ?, 1) ON CONFLICT(user_id, category) DO UPDATE SET correct_count=correct_count+1', (uid, cat), commit=True)
 
@@ -240,7 +171,6 @@ class QuizEngine:
             for l, thresh in sorted(LEVEL_THRESHOLDS.items(), reverse=True):
                 if st.session_state.q_count >= thresh: new_lvl = l; break
             
-            # Level Up Sound
             if new_lvl > st.session_state.level:
                 play_sfx("levelup")
 
@@ -255,7 +185,7 @@ class QuizEngine:
                 st.session_state.pending_badge = new_badge
                 play_sfx("trophy")
         else:
-            st.session_state.consecutive_wins = 0 # Reset de la série
+            st.session_state.consecutive_wins = 0
             st.session_state.hearts = max(0, st.session_state.hearts - 1)
             run_query('UPDATE users SET hearts=? WHERE user_id=?', (st.session_state.hearts, uid), commit=True)
             play_sfx("error")

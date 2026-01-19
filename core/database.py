@@ -180,6 +180,27 @@ def sync_user_to_supabase(user_id):
     except:
         pass
 
+def purge_user_data(user_id):
+    """Supprime toutes les données d'un utilisateur en local et tente sur le Cloud."""
+    # 1. Cloud (Async)
+    def _cloud_purge(uid):
+        try:
+            sb = DatabaseManager.get_supabase()
+            if not sb: return
+            tables = ["users", "history", "stats", "glossary", "notes", "ai_queue"]
+            for t in tables:
+                sb.table(t).delete().eq("user_id", uid).execute()
+        except: pass
+    
+    threading.Thread(target=_cloud_purge, args=(user_id,), daemon=True).start()
+
+    # 2. Local
+    tables = ["users", "history", "stats", "glossary", "notes", "ai_queue"]
+    with DatabaseManager.session() as cursor:
+        for t in tables:
+            cursor.execute(f"DELETE FROM {t} WHERE user_id=?", (user_id,))
+    return True
+
 @st.cache_resource
 def init_db():
     threading.Thread(target=pull_shared_questions, daemon=True).start()

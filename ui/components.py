@@ -3,7 +3,7 @@ import streamlit as st
 import json
 import urllib.parse
 from core.config import MENTOR_AVATARS, COLORS, LOTTIE_URLS, t, SIGNATURE
-from core.database import get_leaderboard, run_query, DatabaseManager
+from core.database import get_leaderboard, run_query, DatabaseManager, purge_user_data
 
 def render_mentor_footer():
     msg = st.session_state.get('mentor_message')
@@ -125,5 +125,19 @@ def render_sidebar():
             st.session_state.clear()
             st.query_params.clear()
             st.rerun()
+
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        with st.expander("⚠️ Zone de Danger"):
+            st.caption("La purge supprimera définitivement votre progression localement et sur le Cloud.")
+            if st.button(t("purge", lang), use_container_width=True, type="secondary"):
+                if st.session_state.get('confirm_purge'):
+                    purge_user_data(st.session_state.user_id)
+                    st.session_state.clear()
+                    st.query_params.clear()
+                    st.success("Compte purgé avec succès.")
+                    st.rerun()
+                else:
+                    st.session_state.confirm_purge = True
+                    st.warning("Êtes-vous sûr ? Cliquez à nouveau pour confirmer.")
     
     st.markdown(SIGNATURE, unsafe_allow_html=True)

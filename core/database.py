@@ -164,21 +164,33 @@ def pull_user_data_from_supabase(user_id):
 def sync_user_to_supabase(user_id):
     sb = DatabaseManager.get_supabase()
     if not sb: return
-    try:
-        with DatabaseManager.session() as cursor:
-            cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
-            ld = cursor.fetchone()
-        if ld:
-            data = {
-                "user_id": str(ld[0]), "name": str(ld[1]), "level": int(ld[2] or 1), 
-                "xp": int(ld[3] or 0), "total_score": int(ld[4] or 0), "mastery": int(ld[5] or 0), 
-                "q_count": int(ld[6] or 0), "hearts": int(ld[7] or 5), "email": str(ld[9] or ""), 
-                "city": str(ld[10] or ""), "crisis_wins": int(ld[13] or 0), "has_diploma": int(ld[15] or 0),
-                "joker_5050": int(ld[17] if len(ld)>17 else 3), "joker_hint": int(ld[18] if len(ld)>18 else 3)
-            }
-            sb.table("users").upsert(data).execute()
-    except:
-        pass
+    
+    import time
+    from datetime import datetime
+    
+    # Retry logic (3 attempts)
+    for attempt in range(3):
+        try:
+            with DatabaseManager.session() as cursor:
+                cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
+                ld = cursor.fetchone()
+            
+            if ld:
+                data = {
+                    "user_id": str(ld[0]), "name": str(ld[1]), "level": int(ld[2] or 1), 
+                    "xp": int(ld[3] or 0), "total_score": int(ld[4] or 0), "mastery": int(ld[5] or 0), 
+                    "q_count": int(ld[6] or 0), "hearts": int(ld[7] or 5), "email": str(ld[9] or ""), 
+                    "city": str(ld[10] or ""), "crisis_wins": int(ld[13] or 0), "has_diploma": int(ld[15] or 0),
+                    "joker_5050": int(ld[17] if len(ld)>17 else 3), "joker_hint": int(ld[18] if len(ld)>18 else 3),
+                    "last_seen": datetime.now().isoformat()
+                }
+                sb.table("users").upsert(data).execute()
+                break # Success
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(1) # Wait before retry
+            else:
+                print(f"Sync failed for user {user_id}: {e}")
 
 def purge_user_data(user_id):
     """Supprime toutes les données d'un utilisateur en local et tente sur le Cloud."""

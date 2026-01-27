@@ -103,7 +103,8 @@ CURRICULUM = {
     1: [("Fondamentaux", 40), ("Logistique", 40), ("Achats", 40)],
     2: [("Planification", 40), ("Stocks", 40), ("Transport", 50)],
     3: [("Digitalisation", 40), ("Flux Connectés", 40), ("IA & Data", 50)],
-    4: [("Stratégie Lean", 40), ("Excellence Op", 40), ("Management", 40)]
+    4: [("Stratégie Lean", 40), ("Excellence Op", 40), ("Management", 40)],
+    5: [("Expertise Continue", 9999)]
 }
 
 TRANSLATIONS = {

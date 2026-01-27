@@ -20,13 +20,16 @@ class QuizEngine:
         for l, thresh in sorted(LEVEL_THRESHOLDS.items(), reverse=True):
             if qc >= thresh: lvl = l; break
         lstart = LEVEL_THRESHOLDS.get(lvl, 0)
-        local_q = qc - lstart
-        if local_q <= 0: local_q = 1
+        local_q = qc - lstart + 1
+        
         cum = 0
         for m_n, m_c in CURRICULUM.get(lvl, CURRICULUM[1]):
             if local_q <= cum + m_c: return m_n, local_q - cum, m_c, lvl
             cum += m_c
-        return CURRICULUM[lvl][-1][0], 1, 1, lvl
+        
+        # Fallback safe
+        safe_curr = CURRICULUM.get(lvl, CURRICULUM[1])
+        return safe_curr[-1][0], 1, 1, lvl
 
     def get_question_from_db(self, lvl):
         uid = st.session_state.user_id
